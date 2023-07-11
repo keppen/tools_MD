@@ -1,0 +1,13 @@
+##[pylyzer] failed /home/keppen/Code/utils_mm/libmath.py 1688733347 8243
+.np = pyimport "numpy"
+
+.itertools = pyimport "itertools"
+
+.calcMiddlePoint: (p0: Never, p1: Iterable(Never)) -> Never
+.calcCentroid: (points: Never) -> Never
+.calcDistance_form_Vector: (point: Obj, vector: Obj) -> Never
+.calcProjectPoint: |R: Type, Type_27 <: Structural({.__div__ = (self: Never, R) -> R})|(point: Iterable(Never), origin: Never, direction: Type_27) -> Never
+.calcLinearRegression_PowerIteration: |R :> numpy.__init__.NDArray(T), R: Type, T: Type|(points: Iterable(R)) -> Structural({.__sub__ = (self: Never, R) -> Never})
+.calcDihedral: |T: Type|(p0: Iterable(T), p1: Iterable(T), p2: Iterable(T), p3: Iterable(T)) -> Never
+.deriv_1st: |O <: Structural({.__div__ = (self: Never, R) -> O}), O <: Structural({.__add__ = (self: Never, R) -> O}), R :> Nat, O: Type, O <: Structural({.__sub__ = (self: Never, R) -> O}), R <: Nat, Type_39 <: Structural({.__sub__ = (self: Never, R) -> O}), R :> {12}, R: Type, O <: Structural({.__div__ = (self: Never, R) -> O})|(p0: Type_39, p1: R, p2: R, p3: R, h: R) -> O
+.deriv_2nd: |O <: Structural({.__div__ = (self: Never, R) -> O}), O <: Structural({.__add__ = (self: Never, R) -> O}), R :> Nat, O <: Structural({.__div__ = (self: Never, R) -> O}), O: Type, R <: Nat, Type_46 <: Structural({.__sub__ = (self: Never, R) -> O}), R: Type|(p0: Type_46, p1: R, p2: R, h: R) -> O

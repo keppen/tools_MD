@@ -1,0 +1,9 @@
+##[pylyzer] failed /home/keppen/Code/utils_mm/libread.py 1688720371 7212
+.readline_2_list: |Type_2 <: Structural({.readline = (self: Obj) -> Never}), Type_2 <: Structural({.readline = (self: Type_2) -> Never})|(file_content: Type_2) -> Never
+.slice_2_type: (slice: Str, new_type: Obj) -> Float
+.str2float: (GenericArray: Obj) -> Never
+.str2int: (GenericArray: Obj) -> Never
+.read_xyz: |Type_2 <: Structural({.readline = (self: Obj) -> Never}), Type_2 <: Structural({.readline = (self: Type_2) -> Never})|(file_content: Type_2) -> NoneType
+.read_cube: |Type_2 <: Structural({.readline = (self: Obj) -> Never}), Type_2 <: Structural({.readline = (self: Type_2) -> Never})|(file_content: Type_2) -> Tuple([Failure, Dict!({{"atom_number"}: Never, {"yvoxels number"}: Never, {"coordinates"}: Failure, {"xaxis vector"}: Failure, {"xvoxels number"}: Never, {"yaxis vector"}: Failure, {"comment"}: Failure, {"zvoxels number"}: Never, {"zaxis vector"}: Failure, {"atom"}: Never, {"charge"}: Never})])
+.read_pdb: |Type_20 <: Structural({.readline = (self: Type_20) -> Never}), Type_20 <: Structural({.readline = (self: Obj) -> Never})|(file_content: Type_20) -> NoneType
+
