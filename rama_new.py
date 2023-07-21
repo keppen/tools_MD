@@ -3,7 +3,7 @@ import time
 import math
 import pandas as pd
 import sys
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import seaborn as sb
 import numpy as np
 import graph_mol
@@ -428,14 +428,14 @@ class Visualize:
         p4 = self._searchByType(df, resid, "C")
         return calcDihedral(p1, p2, p3, p4)
 
-    def _calcPlane_and_Geomcentre(self, df, resid) -> (np.cross, np.array):
+    def _calcPlane_and_Geomcentre(self, df, resid):
         p0 = self._searchByType(df, resid - 1, "O")
         p1 = self._searchByType(df, resid - 1, "OA")
         p2 = self._searchByType(df, resid, "N")
         p3 = self._searchByType(df, resid - 1, "C")
         return calcPlane(p0, p1, p2), p3
 
-    def _calcHbond(self, df, acceptor, donor) -> (np.dot, np.linalg.norm):
+    def _calcHbond(self, df, acceptor, donor):
         p0 = self._searchByType(df, acceptor, "N")
         p1 = self._searchByType(df, acceptor - 1, "C")
         p2 = self._searchByType(df, acceptor, "CG")
@@ -631,14 +631,14 @@ class Visualize:
         ax3.set_xlabel("Degrees")
 
         fig.savefig(f"geom_{name}_{cluster}.png", dpi=500)
-        plt.pyplot.close()
+        plt.close()
 
     def _axis_plot(self):
         name, cluster = self._splitName(self.cluster_pdb)
 
         plot = sb.lineplot(data=self.DF_axis, x="index", y="distance", marker="o")
         plot.figure.savefig(f"axis_{name}_{cluster}.png", dpi=500)
-        plt.pyplot.close()
+        plt.close()
 
 
 if __name__ == "__main__":

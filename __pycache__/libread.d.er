@@ -1,4 +1,4 @@
-##[pylyzer] failed /home/keppen/Code/utils_mm/libread.py 1688720371 7212
+##[pylyzer] failed /home/keppen/Code/tools_MD/libread.py 1688720371 7212
 .readline_2_list: |Type_2 <: Structural({.readline = (self: Obj) -> Never}), Type_2 <: Structural({.readline = (self: Type_2) -> Never})|(file_content: Type_2) -> Never
 .slice_2_type: (slice: Str, new_type: Obj) -> Float
 .str2float: (GenericArray: Obj) -> Never
