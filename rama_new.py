@@ -30,7 +30,7 @@ class Visualize:
         self.MOL = graph_mol.Molecule()
         self.truncate = int(truncate) if truncate else truncate
         self.options = "dhac" if options == "all" else options
-        self.step = int(step) if step else step
+        self.step = int(step) if step else 1
 
         self.limit = True
 
@@ -151,6 +151,8 @@ class Visualize:
         while self.limit:
             self._collectData()
             self._mapRuns(self.runs_function)
+            print("MODEL: ", self.model, end="\r")
+            # self._printProgress(self.model)
 
     def _runTruncated(self):
         while self.limit:
@@ -161,6 +163,7 @@ class Visualize:
             if self.model % self.step != 0:
                 continue
 
+            # self._printProgress(self.model)
             print("MODEL: ", self.model, end="\r")
             self._mapRuns(self.runs_function)
 
@@ -239,6 +242,9 @@ class Visualize:
             )
         self.points_backbone = [p for p in points if p.all()]
 
+    def _estimateBandwidth(self, data: pd.DataFrame):
+        pass
+
     def _collectData(self):
         try:
             self.model, pdb_data = next(self.pdb_gen)
@@ -303,7 +309,6 @@ class Visualize:
             )
 
     def _collectHbond(self):
-        NH_bondlenght = 0.99
         max_resid = self.DF_pdb.max()["residue_seqnumber"]
 
         for acceptor in range(2, max_resid + 1):
@@ -314,7 +319,7 @@ class Visualize:
                 self.resid_acceptor.append(acceptor)
                 self.resid_donor.append(donor)
                 self.angle.append(angle)
-                self.lenght.append(lenght - NH_bondlenght)
+                self.lenght.append(lenght)
 
     def _collectAxis(self):
         self.axis = calcLinearRegression_PowerIteration(self.points_backbone)
@@ -354,9 +359,15 @@ class Visualize:
         self.DF_hbond = pd.DataFrame.from_dict(
             self.dict_hbond, orient="index"
         ).transpose()
+        self.DF_hbond["Hbond presence"] = np.where(
+                (self.DF_hbond["angle"] <= 30) &
+                (self.DF_hbond["lenght"] <= 3.5),
+                1,
+                0
+                        )
         self.pivot_hbond = pd.pivot_table(
             self.DF_hbond,
-            values="angle",
+            values="Hbond presence",
             index="residue acceptor",
             columns="residue donor",
             aggfunc=np.mean,
@@ -455,6 +466,8 @@ class Visualize:
         sb.heatmap(
             self.pivot_hbond,
             cmap="crest",
+            vmin=0,
+            vmax=1,
         )
         f.savefig(
             f"hbond_{name}_{cluster}.png",
@@ -512,7 +525,6 @@ class Visualize:
             self.DF_dihedrals["OmegaBis"],
             self.DF_dihedrals["Psi"],
         ]
-
         hue_order = [4, 3, 2]
         sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
         colors = ["black", "red", "blue"]
@@ -643,15 +655,19 @@ class Visualize:
 
 if __name__ == "__main__":
     print(sys.argv)
+
+    truncate = None
+    options = "all"
+    step = None
+
     start_time = time.time()
-    try:
-        truncate = sys.argv[3]
-        options = sys.argv[4]
-        step = sys.argv[5]
-    except IndexError:
-        truncate = None
-        options = None
-        step = None
+    for index, arg in enumerate(sys.argv):
+        if arg in ['-t', '--truncate']:
+            truncate = sys.argv[index + 1]
+        if arg in ['-o', '--options']:
+            options = sys.argv[index + 1]
+        if arg in ['-s', '--step']:
+            step = sys.argv[index + 1]
     R = Visualize(
         sys.argv[1], sys.argv[2], truncate=truncate, step=step, options=options
     )
