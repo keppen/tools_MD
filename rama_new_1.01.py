@@ -1,7 +1,8 @@
 #!/home/mszatko/.conda/envs/code/bin/python3
 import time
 import math
-import scipy
+from scipy import stats
+# from mayavi import mlab
 import pandas as pd
 import sys
 import matplotlib as plt
@@ -24,7 +25,7 @@ from libmath import (
 
 class Visualize:
     def __init__(
-        self, structure_pdb, cluster_pdb, options="all", truncate=None, step=None
+        self, structure_pdb, cluster_pdb, options="all", truncate=None, step=None, no_plot=False
     ):
         self.structure_pdb = structure_pdb
         self.cluster_pdb = cluster_pdb
@@ -32,6 +33,7 @@ class Visualize:
         self.truncate = int(truncate) if truncate else truncate
         self.options = "dhac" if options == "all" else options
         self.step = int(step) if step else 1
+        self.no_plot = no_plot
 
         self.limit = True
 
@@ -145,12 +147,15 @@ class Visualize:
             self._runAll()
         self._mapRuns(self.dataframe_funtion)
         print(
-                self.DF_dihedrals,
+                # self.DF_dihedrals,
                 # self.DF_hbond,
                 # self.DF_axis,
                 # self.DF_distance,
-              sep="\n")
-        self._mapRuns(self.plot_function)
+                sep="\n"
+             )
+
+        if not self.no_plot:
+            self._mapRuns(self.plot_function)
 
     def _runAll(self):
         while self.limit:
@@ -253,7 +258,7 @@ class Visualize:
     def _collectData(self):
         try:
             self.model, pdb_data = next(self.pdb_gen)
-            print(pdb_data)
+            # print(pdb_data)
             self.DF_pdb = pd.DataFrame.from_dict(pdb_data, orient="index").transpose()
             self._centerPoints()
         except StopIteration:
@@ -360,8 +365,29 @@ class Visualize:
         self.DF_dihedrals = pd.DataFrame.from_dict(
             self.dict_dihedral, orient="index"
         ).transpose()
-        xyz = np.vstack(self.DF_dihedrals[["Phi", "OmegaPrim", "OmegaBis"]])
-        print(xyz)
+        name, cluster = self._splitName(self.cluster_pdb)
+        x = self.DF_dihedrals["Phi"]
+        y = self.DF_dihedrals["OmegaPrim"]
+        z = self.DF_dihedrals[ "OmegaBis"]
+        # mu, sigma = 0, 0.1 
+        # x = 10*np.random.normal(mu, sigma, 5000)
+        # y = 10*np.random.normal(mu, sigma, 5000)
+        # z = 10*np.random.normal(mu, sigma, 5000)
+
+        # xyz = np.stack([x,y,z])
+        xyz = np.vstack(
+            [
+                x.transpose().to_numpy(),
+                # y.transpose().to_numpy(),
+                # z.transpose().to_numpy(),
+            ]
+        )
+        kde = stats.gaussian_kde(xyz)
+        density = kde(xyz)
+
+        # density = stats.gaussian_kde(xyz) 
+        print(density)
+        # self.DF_dihedrals.to_csv(f"{name}-{cluster}-dihedral.csv")
 
     def _dataframeHbond(self):
         self.DF_hbond = pd.DataFrame.from_dict(
@@ -510,9 +536,6 @@ class Visualize:
 
         # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
         plt.pyplot.close()
-
-    def rama_3d(self):
-        pass
 
     def _rama_plot(self, chirality=None):
         """Plots a Ramachandram plot from seaborn.JointGrid provided with pandas.DataFrame.
@@ -675,6 +698,7 @@ if __name__ == "__main__":
     truncate = None
     options = "all"
     step = None
+    no_plot = False
 
     start_time = time.time()
     for index, arg in enumerate(sys.argv):
@@ -684,8 +708,15 @@ if __name__ == "__main__":
             options = sys.argv[index + 1]
         if arg in ['-s', '--step']:
             step = sys.argv[index + 1]
+        if arg in ["--no-plot"]:
+            no_plot = True
     R = Visualize(
-        sys.argv[1], sys.argv[2], truncate=truncate, step=step, options=options
+        sys.argv[1],
+        sys.argv[2],
+        truncate=truncate,
+        step=step,
+        options=options,
+        no_plot=no_plot
     )
     R._initRun()
 

@@ -196,6 +196,7 @@ def read_pdb(file_content):
             segment_identifier.append(slice_2_type(line[72:77], 's'))
             element_symbol.append(slice_2_type(line[76:78], 's'))
             charge.append(slice_2_type(line[78:80], 's'))
+            break
 
         if line.strip() in ["ENDMDL", "END"]:
             yield model, dictionary_data
@@ -203,6 +204,27 @@ def read_pdb(file_content):
                 data.clear()
 
     print(f'Collecting model: {model - 1}', '\tINFO: Done', sep='\n')
+
+# def check_line(line):
+#     print(line)
+#     print(
+#             f'ATOM  ',
+#             f'{atom_serialnumber[0]:>5}',
+#             f'{atom_name[0]:4}'
+#             f'{alternate_location[0]:1}',
+#             f'{residue_name[0]:>3}',
+#             f'{chain_location[0]:1}',
+#             f'{residue_seqnumber[0]:>4}',
+#             f'{code_insertions_residue[0]:1}',
+#             f'{x[0]:>8.3f}',
+#             f'{y[0]:>8.3f}',
+#             f'{z[0]:>8.3f}',
+#             f'{occupancy[0]:>6.2f}',
+#             f'{temperature_factor[0]:>6.2f}',
+#             f'{segment_identifier[0]:4}',
+#             f'{element_symbol[0]:>2}',
+#             f'{charge[0]:2}',
+#             )
 
 
 if __name__ == '__main__':
