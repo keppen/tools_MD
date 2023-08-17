@@ -1,5 +1,7 @@
 #!/home/keppen/.conda/envs/code/bin/python3
 import sys
+from libread import read_pdb, dict_2_list
+from libwrite import write_pdb
 
 
 def prep_line(line):
@@ -26,7 +28,7 @@ class Molecule:
         Returns: None
         """
         d = {
-            "id": index,
+            "id": int(index),
             "element": atom,
             "type": "",
             "bonds": set(),
@@ -40,18 +42,19 @@ class Molecule:
         Setting up a molecule as a graph.
 
         Parameters:
-            bond (list): a list of integers, list[0] an aton to which list[1:]
+            bond (list): a list of integers, list[0] an atom to which list[1:]
             are connected to.
 
         Returns:: None
         """
         for i in bond[1:]:
             for atom in self.atoms:
-                if atom["id"] == bond[0]:
-                    atom["bonds"].add(i)
+                if atom["id"] == int(bond[0]):
+                    atom["bonds"].add(int(i))
 
     def run(self):
         """Run the methods of the class"""
+
         self._findN()
         self._findCT()
         self._findNT()
@@ -82,45 +85,41 @@ class Molecule:
             finally:
                 del search
 
-    def updatePDB(self, file):
-        with open(file, "r") as f:
-            print(f"READING: {file}")
-            f = f.readlines()
-        with open(f"NEW_{file}", "w") as o:
-            print(f"CREATING: NEW_{file}")
-            for raw_line in f:
-                line = prep_line(raw_line)
-                if line[0] == "ATOM" and line[3] == "BPA":
-                    continue
-                if line[0] in ["ATOM", "HETATM"]:
-                    atom = self._findbyID(line[1])
-                    line[0] = "ATOM"
-                    line[2] = atom["type"]
-                    line[3] = "UNK"
-                    line[4] = atom["resid"]
-                    line = (
-                        f"{line[0]:<6}"  # 'ATOM  '
-                        f"{line[1]:>5}"  # Atom serial number
-                        f'{" " * 1}'  # BLANK
-                        f"{line[2]:<4}"  # Atom name
-                        f'{" " * 1}'  # Alternate location indicator
-                        f"{line[3]:>3}"  # Residue name
-                        f'{" " * 1}'  # BLANK
-                        f'{" " * 1}'  # Chain indetifier
-                        f"{line[4]:>4}"  # Residue sequence number
-                        f'{" " * 1}'  # Code for insertion of residues
-                        f'{" " * 3}'  # BLANK
-                        f"{line[5]:>8}"  # x Coord
-                        f"{line[6]:>8}"  # y Coord
-                        f"{line[7]:>8}"  # z Coord
-                        f"{line[8]:>6}"  # Occupancy
-                        f"{line[9]:>6}\n"  # Temperature factor
-                    )
-                    o.write(line)
-                else:
-                    o.write(raw_line)
-        print(f"NEW_{file} has been created. Check it for any problems")
-        return f"NEW_{file}"
+    def updateDataPDB(self, line):
+        line = list(line)
+        if line[3] == "BPA":
+            return None
+        atom = self._findbyID(line[0])
+        line[1] = atom["type"]
+        line[3] = "UNK"
+        line[5] = atom["resid"]
+        return line
+
+    def newPDB(self, cluster_pdb):
+        cluster_pdb_content = open(cluster_pdb, "r")
+        generator = read_pdb(cluster_pdb_content)
+
+        # pdb_file = [r[1].values() for r in generator]
+        pdb_file = []
+        for record in generator:
+            record = record[1]
+            pdb_file.append(dict_2_list(record))
+
+        print("Updating data")
+
+        for i1, record in enumerate(pdb_file):
+            for i2, line in enumerate(record):
+                pdb_file[i1][i2] = self.updateDataPDB(line)
+
+        file_name = f"NEW_{cluster_pdb}"
+        print(f"CREATING: {file_name}")
+
+        # print(*pdb_file, sep=3*'\n')
+
+        write_pdb(pdb_file, file_name, model=True)
+
+        print(f"NEW_{cluster_pdb} has been created. Check it for any problems")
+        return f"NEW_{cluster_pdb}"
 
     def printout(self):
         """A debug method"""
@@ -348,6 +347,7 @@ class Molecule:
                         yield node_path
                         continue
                     yield node_path
+
                     queue.append(node_path)
 
 
@@ -364,4 +364,4 @@ if __name__ == "__main__":
         if line[0] == "CONECT":
             mol.add_bond(line[1:])
     mol.run()
-    mol.updatePDB(cluster_pdb)
+    mol.newPDB(cluster_pdb)

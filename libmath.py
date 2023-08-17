@@ -261,7 +261,8 @@ step size: {step_size}
                 )
             )
             for j in range(self.dimension):
-                combinations.extend(list(itertools.combinations(next_to, j + 1)))
+                combinations.extend(
+                    list(itertools.combinations(next_to, j + 1)))
             combinations = [np.prod(set) for set in combinations]
             A_matrix[index] = combinations
             b_matrix[index] = self.data[

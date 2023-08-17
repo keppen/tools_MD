@@ -3,12 +3,11 @@ import time
 import math
 import pandas as pd
 import sys
-import matplotlib.pyplot as plt
-import seaborn as sb
 import numpy as np
 import graph_mol
 import re
 from libread import read_pdb
+from scipy import stats
 from libmath import (
     calcDihedral,
     calcLinearRegression_PowerIteration,
@@ -23,16 +22,23 @@ from libmath import (
 
 class Visualize:
     def __init__(
-        self, structure_pdb, cluster_pdb, options="all", truncate=None, step=None
+        self,
+        structure_pdb,
+        cluster_pdb,
+        options="all",
+        truncate=None,
+        step=None,
+        no_plot=False,
     ):
         self.structure_pdb = structure_pdb
         self.cluster_pdb = cluster_pdb
         self.MOL = graph_mol.Molecule()
         self.truncate = int(truncate) if truncate else truncate
-        self.options = "dhac" if options == "all" else options
+        self.options = "dghac" if options == "all" else options
         self.step = int(step) if step else 1
+        self.no_plot=no_plot
 
-        self.limit = True
+        self.no_limit = True
 
         self.DF_pdb: pd.DataFrame
         self.DF_dihedrals: pd.DataFrame
@@ -42,6 +48,7 @@ class Visualize:
 
         self.runs_function = [
             self._collectDih,
+            self._collectGeometry,
             self._collectHbond,
             self._collectAxis,
             self._collectDistance,
@@ -58,7 +65,7 @@ class Visualize:
             self._dataframeAxis,
             self._dataframeDistance,
         ]
-        self.runs_bool = [True if c in self.options else False for c in "dhac"]
+        self.runs_bool = [True if c in self.options else False for c in "dghac"]
 
     def _initDicts(self):
         self.models_dihedral = []
@@ -145,17 +152,20 @@ class Visualize:
         self._mapRuns(self.dataframe_funtion)
         # print(self.DF_dihedrals, self.DF_hbond,
         #       self.DF_axis, self.DF_distance, sep="\n")
+        if self.no_plot:
+            return 1
+
         self._mapRuns(self.plot_function)
 
     def _runAll(self):
-        while self.limit:
+        while self.no_limit:
             self._collectData()
             self._mapRuns(self.runs_function)
             print("MODEL: ", self.model, end="\r")
             # self._printProgress(self.model)
 
     def _runTruncated(self):
-        while self.limit:
+        while self.no_limit:
             self._collectData()
 
             if self.model == self.truncate:
@@ -214,7 +224,7 @@ class Visualize:
             if line[0] == "CONECT":
                 self.MOL.add_bond(line[1:])
         self.MOL.run()
-        self.cluster_pdb = self.MOL.updatePDB(self.cluster_pdb)
+        self.cluster_pdb = self.MOL.newPDB(self.cluster_pdb)
 
     def _printProgress(self, model):
         if model < 1000 and model % 200 == 0:
@@ -251,7 +261,7 @@ class Visualize:
             self.DF_pdb = pd.DataFrame.from_dict(pdb_data, orient="index").transpose()
             self._centerPoints()
         except StopIteration:
-            self.limit = False
+            self.no_limit = False
 
     def _collectDih(self):
         """Calculate dihedrals with data collected from pdb file.
@@ -355,16 +365,58 @@ class Visualize:
             self.dict_dihedral, orient="index"
         ).transpose()
 
+        from mayavi import mlab
+        mlab.options.offscreen = True
+        # fig = mlab.figure(figure=None)
+        # mlab.options.backend = 'envisage'
+
+        DF_angles = self.DF_dihedrals[["Phi", "OmegaPrim", "OmegaBis"]]
+        np_angles = DF_angles.to_numpy(dtype=np.float64)
+        np_angles = np_angles.T
+        print(np_angles)
+
+        kde = stats.gaussian_kde(np_angles)
+
+        xmin, ymin, zmin = -180, -180, -180
+        xmax, ymax, zmax = 180, 180, 180
+        xi, yi, zi = np.mgrid[xmin:xmax:180j, ymin:ymax:180j, zmin:zmax:180j]
+
+        coords = np.vstack([item.ravel() for item in [xi, yi, zi]])
+        density = kde(coords).reshape(xi.shape)
+
+        print(coords, density)
+
+        mlab.contour3d(xi, yi, zi, density, opacity=0.5)
+        mlab.axes()
+        mlab.savefig("test.png")
+        mlab.close(fig)
+
+        # np.random.seed(1)
+        # N = 20
+        # X = np.concatenate(
+        #     (np.random.normal(0, 1, int(0.3 * N)), np.random.normal(5, 1, int(0.7 * N)))
+        # )[:, np.newaxis]
+        # X_plot = np.linspace(-5, 10, 10)[:, np.newaxis]
+        # bins = np.linspace(-5, 10, 10)
+        # print(X, X_plot, bins, sep=3*"\n")
+
+        # mu=np.array([1,10,20])
+        # sigma=np.matrix([[20,10,10],
+        #                  [10,25,1],
+        #                  [10,1,50]])
+        #
+        # data=np.random.multivariate_normal(mu,sigma,1000)
+        # values = data.T
+        #
+        # print(mu, sigma, data, values, sep=3*'\n')
+
     def _dataframeHbond(self):
         self.DF_hbond = pd.DataFrame.from_dict(
             self.dict_hbond, orient="index"
         ).transpose()
         self.DF_hbond["Hbond presence"] = np.where(
-                (self.DF_hbond["angle"] <= 30) &
-                (self.DF_hbond["lenght"] <= 3.5),
-                1,
-                0
-                        )
+            (self.DF_hbond["angle"] <= 30) & (self.DF_hbond["lenght"] <= 3.5), 1, 0
+        )
         self.pivot_hbond = pd.pivot_table(
             self.DF_hbond,
             values="Hbond presence",
@@ -457,12 +509,15 @@ class Visualize:
         return calcAngle(line1, line2), np.linalg.norm(line2)
 
     def _hbond_plot(self):
+        import seaborn as sb
+        import matplotlib.pyplot as plt
+
         name, cluster = self._splitName(self.cluster_pdb)
 
         sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
 
         print(self.pivot_hbond)
-        f, ax = plt.pyplot.subplots()
+        f, ax = plt.subplots()
         sb.heatmap(
             self.pivot_hbond,
             cmap="crest",
@@ -475,15 +530,17 @@ class Visualize:
         )
 
         # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
-        plt.pyplot.close()
+        plt.close()
 
     def _contact_plot(self):
+        import seaborn as sb
+        import matplotlib.pyplot as plt
         name, cluster = self._splitName(self.cluster_pdb)
 
         sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
 
         print(self.pivot_distance)
-        f, ax = plt.pyplot.subplots()
+        f, ax = plt.subplots()
         sb.heatmap(
             self.pivot_distance,
             cmap="crest",
@@ -496,7 +553,7 @@ class Visualize:
         )
 
         # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
-        plt.pyplot.close()
+        plt.close()
 
     def _rama_plot(self, chirality=None):
         """Plots a Ramachandram plot from seaborn.JointGrid provided with pandas.DataFrame.
@@ -507,6 +564,8 @@ class Visualize:
                 regard to residue indexes.
         Chirality should be provided, it is presumed "S" isomers otherwise.
         """
+        import seaborn as sb
+        import matplotlib.pyplot as plt
         print("INFO: Starting plotting")
         name, cluster = self._splitName(self.cluster_pdb)
         if chirality is None:
@@ -588,12 +647,15 @@ class Visualize:
             )
 
             # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
-            plt.pyplot.close()
+            plt.close()
             print(
                 f'INFO: {letters["latin"][i]}_{name}_{cluster}.png has been generated'
             )
 
     def _geom_plot(self):
+        import seaborn as sb
+        import matplotlib.pyplot as plt
+
         name, cluster = self._splitName(self.cluster_pdb)
 
         letters = {
@@ -604,7 +666,7 @@ class Visualize:
         sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
         colors = ["black", "red", "blue"]
 
-        fig, (ax1, ax2, ax3) = plt.pyplot.subplots(3, 1, figsize=(7, 5), sharex=True)
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(7, 5), sharex=True)
         x1 = self.DF_geometry.Alpha
         x2 = self.DF_geometry.Theta1
         x3 = self.DF_geometry.Theta2
@@ -646,6 +708,9 @@ class Visualize:
         plt.close()
 
     def _axis_plot(self):
+        import seaborn as sb
+        import matplotlib.pyplot as plt
+
         name, cluster = self._splitName(self.cluster_pdb)
 
         plot = sb.lineplot(data=self.DF_axis, x="index", y="distance", marker="o")
@@ -659,17 +724,25 @@ if __name__ == "__main__":
     truncate = None
     options = "all"
     step = None
+    no_plot = False
 
     start_time = time.time()
     for index, arg in enumerate(sys.argv):
-        if arg in ['-t', '--truncate']:
+        if arg in ["-t", "--truncate"]:
             truncate = sys.argv[index + 1]
-        if arg in ['-o', '--options']:
+        if arg in ["-o", "--options"]:
             options = sys.argv[index + 1]
-        if arg in ['-s', '--step']:
+        if arg in ["-s", "--step"]:
             step = sys.argv[index + 1]
+        if arg in ["--no-plot"]:
+            no_plot = True
     R = Visualize(
-        sys.argv[1], sys.argv[2], truncate=truncate, step=step, options=options
+        sys.argv[1],
+        sys.argv[2],
+        truncate=truncate,
+        step=step,
+        options=options, 
+        no_plot=no_plot
     )
     R._initRun()
 
