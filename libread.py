@@ -188,6 +188,7 @@ def read_pdb(file_content):
 
         if line[:4] == "ATOM":
             # models.append(model)
+<<<<<<< HEAD
             atom_serialnumber.append(slice_2_type(line[6:11], "i"))
             atom_name.append(slice_2_type(line[12:16], "s"))
             alternate_location.append(slice_2_type(line[16], "s"))
@@ -203,6 +204,24 @@ def read_pdb(file_content):
             segment_identifier.append(slice_2_type(line[72:76], "s"))
             element_symbol.append(slice_2_type(line[76:78], "s"))
             charge.append(slice_2_type(line[78:80], "s"))
+=======
+            atom_serialnumber.append(slice_2_type(line[6:11], 'i'))
+            atom_name.append(slice_2_type(line[12:16], 's'))
+            alternate_location.append(slice_2_type(line[16], 's'))
+            residue_name.append(slice_2_type(line[17:20], 's'))
+            chain_location.append(slice_2_type(line[21], 's'))
+            residue_seqnumber.append(slice_2_type(line[22:26], 'i'))
+            code_insertions_residue.append(slice_2_type(line[27], 's'))
+            x.append(slice_2_type(line[30:38], 'f'))
+            y.append(slice_2_type(line[38:46], 'f'))
+            z.append(slice_2_type(line[46:54], 'f'))
+            occupancy.append(slice_2_type(line[54:60], 'f'))
+            temperature_factor.append(slice_2_type(line[60:66], 'f'))
+            segment_identifier.append(slice_2_type(line[72:77], 's'))
+            element_symbol.append(slice_2_type(line[76:78], 's'))
+            charge.append(slice_2_type(line[78:80], 's'))
+            break
+>>>>>>> 90efdacfb3eda30f167d3ee48d9354700531347f
 
         if line.strip() in ["ENDMDL", "END"]:
             # print(dictionary_data, end=3*"\n")
@@ -211,6 +230,27 @@ def read_pdb(file_content):
                 data.clear()
 
     print(f"Collecting model: {model - 1}", "\tINFO: Done", sep="\n")
+
+# def check_line(line):
+#     print(line)
+#     print(
+#             f'ATOM  ',
+#             f'{atom_serialnumber[0]:>5}',
+#             f'{atom_name[0]:4}'
+#             f'{alternate_location[0]:1}',
+#             f'{residue_name[0]:>3}',
+#             f'{chain_location[0]:1}',
+#             f'{residue_seqnumber[0]:>4}',
+#             f'{code_insertions_residue[0]:1}',
+#             f'{x[0]:>8.3f}',
+#             f'{y[0]:>8.3f}',
+#             f'{z[0]:>8.3f}',
+#             f'{occupancy[0]:>6.2f}',
+#             f'{temperature_factor[0]:>6.2f}',
+#             f'{segment_identifier[0]:4}',
+#             f'{element_symbol[0]:>2}',
+#             f'{charge[0]:2}',
+#             )
 
 
 if __name__ == "__main__":
