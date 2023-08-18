@@ -6,10 +6,11 @@ import sys
 import numpy as np
 import graph_mol
 import re
+import libplot
 from libread import read_pdb
 from scipy import stats
 from libmath import (
-    calcDihedral,
+    calculate_dihedral,
     calcLinearRegression_PowerIteration,
     calcDistance_form_Vector,
     calcCentroid,
@@ -201,7 +202,7 @@ class Visualize:
             cluster = cluster[1:]
 
         name = file[1]
-        print(f"CHECK THE FILE N?AME AND PICK CAREFULLY: {file}")
+        print(f"CHECK THE FILE NAME AND PICK CAREFULLY: {file}")
         print(f"indexes picked: \n\tcluser: {cluster}\n\tname: {name}")
         return name, cluster
 
@@ -258,7 +259,7 @@ class Visualize:
     def _collectData(self):
         try:
             self.model, pdb_data = next(self.pdb_gen)
-            print(pdb_data)
+            # print(pdb_data)
             self.DF_pdb = pd.DataFrame.from_dict(
                 pdb_data, orient="index").transpose()
             self._centerPoints()
@@ -297,28 +298,30 @@ class Visualize:
         """
         max_resid = self.DF_pdb.max()["residue_seqnumber"]
 
+        # print(self.model)
+
         res0 = None
         res1 = None
         for resid in range(2, max_resid):
             res0 = res1 or self._calcPlane_and_Geomcentre(self.DF_pdb, resid)
             res1 = self._calcPlane_and_Geomcentre(self.DF_pdb, resid + 1)
             a = calcAngle(res0[0], res1[0])
-            a = math.acos(a) / math.pi * 180
+            a = np.degrees(math.acos(a))
             line = calcVector(res0[1], res1[1])
             t1 = calcAngle(res0[0], line)
             t2 = calcAngle(res1[0], line)
-            t1 = math.asin(abs(t1)) / math.pi * 180
-            t2 = math.asin(abs(t2)) / math.pi * 180
-            # t1 = t1 if t1 >= 0 else t1 + 180
-            # t2 = t2 if t2 >= 0 else t2 + 180
+            t1 = np.degrees(math.asin(abs(t1)))
+            t2 = np.degrees(math.asin(abs(t2)))
             self.models_geometry.append(self.model)
             self.resids_geometry.append(resid)
             self.alpha.append(a)
             self.theta1.append(t1)
             self.theta2.append(t2)
             print(
-                f"plane1: {res0[0]}\nplane2: {res1[0]}\nalpha: {a}\ntheta1: {t1}\ntheta2: {t2}"
+                f"plane1: {res0}\nplane2: {res1}\nalpha: {a}\ntheta1: {t1}\ntheta2: {t2}"
             )
+
+            # libplot.debug_geometry(res0[0], res1[0], res0[1], res1[1])
 
     def _collectHbond(self):
         max_resid = self.DF_pdb.max()["residue_seqnumber"]
@@ -367,53 +370,12 @@ class Visualize:
         self.DF_dihedrals = pd.DataFrame.from_dict(
             self.dict_dihedral, orient="index"
         ).transpose()
-        xyz = np.vstack(self.DF_dihedrals[["Phi", "OmegaPrim", "OmegaBis"]])
-        print(xyz)
-
-        from mayavi import mlab
-        mlab.options.offscreen = True
-        # fig = mlab.figure(figure=None)
-        # mlab.options.backend = 'envisage'
-
+        from libplot import mavi_contour
         DF_angles = self.DF_dihedrals[["Phi", "OmegaPrim", "OmegaBis"]]
         np_angles = DF_angles.to_numpy(dtype=np.float64)
-        np_angles = np_angles.T
-        print(np_angles)
-
-        kde = stats.gaussian_kde(np_angles)
-
-        xmin, ymin, zmin = -180, -180, -180
-        xmax, ymax, zmax = 180, 180, 180
-        xi, yi, zi = np.mgrid[xmin:xmax:180j, ymin:ymax:180j, zmin:zmax:180j]
-
-        coords = np.vstack([item.ravel() for item in [xi, yi, zi]])
-        density = kde(coords).reshape(xi.shape)
-
-        print(coords, density)
-
-        mlab.contour3d(xi, yi, zi, density, opacity=0.5)
-        mlab.axes()
-        mlab.savefig("test.png")
-        mlab.close(fig)
-
-        # np.random.seed(1)
-        # N = 20
-        # X = np.concatenate(
-        #     (np.random.normal(0, 1, int(0.3 * N)), np.random.normal(5, 1, int(0.7 * N)))
-        # )[:, np.newaxis]
-        # X_plot = np.linspace(-5, 10, 10)[:, np.newaxis]
-        # bins = np.linspace(-5, 10, 10)
-        # print(X, X_plot, bins, sep=3*"\n")
-
-        # mu=np.array([1,10,20])
-        # sigma=np.matrix([[20,10,10],
-        #                  [10,25,1],
-        #                  [10,1,50]])
-        #
-        # data=np.random.multivariate_normal(mu,sigma,1000)
-        # values = data.T
-        #
-        # print(mu, sigma, data, values, sep=3*'\n')
+        mavi_contour(np_angles)
+        # np_angles = np_angles.T
+        # print(np_angles)
 
     def _dataframeHbond(self):
         self.DF_hbond = pd.DataFrame.from_dict(
@@ -476,7 +438,7 @@ class Visualize:
         p2 = self._searchByType(df, resid, "N")
         p3 = self._searchByType(df, resid, "CG")
         p4 = self._searchByType(df, resid, "CB")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcPsi(self, df, resid):
         """Helper function"""
@@ -484,7 +446,7 @@ class Visualize:
         p2 = self._searchByType(df, resid, "OA")
         p3 = self._searchByType(df, resid, "C")
         p4 = self._searchByType(df, resid + 1, "N")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcOmegaPrim(self, df, resid):
         """Helper function"""
@@ -492,7 +454,7 @@ class Visualize:
         p2 = self._searchByType(df, resid, "CG")
         p3 = self._searchByType(df, resid, "CB")
         p4 = self._searchByType(df, resid, "OA")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcOmegaBis(self, df, resid):
         """Helper function"""
@@ -500,14 +462,15 @@ class Visualize:
         p2 = self._searchByType(df, resid, "CB")
         p3 = self._searchByType(df, resid, "OA")
         p4 = self._searchByType(df, resid, "C")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcPlane_and_Geomcentre(self, df, resid):
         p0 = self._searchByType(df, resid - 1, "O")
         p1 = self._searchByType(df, resid - 1, "OA")
         p2 = self._searchByType(df, resid, "N")
         p3 = self._searchByType(df, resid - 1, "C")
-        return calcPlane(p0, p1, p2), p3
+        # print(p0, p1, p2, p3)
+        return calcPlane(p0, p2, p1), p3
 
     def _calcHbond(self, df, acceptor, donor):
         p0 = self._searchByType(df, acceptor, "N")

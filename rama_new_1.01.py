@@ -12,7 +12,7 @@ import graph_mol
 import re
 from libread import read_pdb
 from libmath import (
-    calcDihedral,
+    calculate_dihedral,
     calcLinearRegression_PowerIteration,
     calcDistance_form_Vector,
     calcCentroid,
@@ -452,7 +452,7 @@ class Visualize:
         p2 = self._searchByType(df, resid, "N")
         p3 = self._searchByType(df, resid, "CG")
         p4 = self._searchByType(df, resid, "CB")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcPsi(self, df, resid):
         """Helper function"""
@@ -460,7 +460,7 @@ class Visualize:
         p2 = self._searchByType(df, resid, "OA")
         p3 = self._searchByType(df, resid, "C")
         p4 = self._searchByType(df, resid + 1, "N")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcOmegaPrim(self, df, resid):
         """Helper function"""
@@ -468,7 +468,7 @@ class Visualize:
         p2 = self._searchByType(df, resid, "CG")
         p3 = self._searchByType(df, resid, "CB")
         p4 = self._searchByType(df, resid, "OA")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcOmegaBis(self, df, resid):
         """Helper function"""
@@ -476,7 +476,7 @@ class Visualize:
         p2 = self._searchByType(df, resid, "CB")
         p3 = self._searchByType(df, resid, "OA")
         p4 = self._searchByType(df, resid, "C")
-        return calcDihedral(p1, p2, p3, p4)
+        return calculate_dihedral(p1, p2, p3, p4)
 
     def _calcPlane_and_Geomcentre(self, df, resid) -> (np.cross, np.array):
         p0 = self._searchByType(df, resid - 1, "O")

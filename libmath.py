@@ -1,8 +1,12 @@
 import numpy as np
 import itertools
+from sklearn.model_selection import GridSearchCV, LeaveOneOut
+# from sklearn.cross_validation import LeaveOneOut
+from sklearn.neighbors import KernelDensity
 
 
 def calcVector(p0, p1) -> np.array:
+    # print(p0 ,p1)
     p0 = np.array(p0)
     p1 = np.array(p1)
     return p1 - p0
@@ -15,8 +19,19 @@ def calcAngle(v0, v1) -> np.array:
 
 
 def calcPlane(p0, p1, p2) -> np.array:
+    # print(p0, p1, p2)
     v0 = calcVector(p0, p1)
-    v1 = calcVector(p1, p2)
+    v1 = calcVector(p0, p2)
+
+    # print(v0, v1)
+
+    len0 = np.linalg.norm(v0)
+    len1 = np.linalg.norm(v1)
+    v0 = v0/len0
+    v1 = v1/len1
+
+    # print(v0, v1)
+
     return np.cross(v0, v1)
 
 
@@ -84,7 +99,7 @@ def calcLinearRegression_PowerIteration(points):
     return eigenvector
 
 
-def calcDihedral(p0, p1, p2, p3):
+def calculate_dihedral(p0, p1, p2, p3):
     """Calculated a dihedral provided with four points.
 
     Parameters:
@@ -110,6 +125,61 @@ def calcDihedral(p0, p1, p2, p3):
     cos = np.dot(b1xb0, b2xb1)
     sin = np.dot(b1_b0_x_b2xb1, b1)
     return np.degrees(np.arctan2(sin, cos))
+
+
+def estiamte_bandwidth(data):
+    bw = 10 ** np.linspace(-3, 3, 200)
+    grid = GridSearchCV(
+        KernelDensity(kernel="gaussian"),
+        {"bandwidth": bw},
+        cv=LeaveOneOut()
+    )
+    grid.fit(data)
+    best_params = grid.best_params_
+    best_bandwidth = best_params['bandwidth']  # Extract the best bandwidth value
+    print(best_bandwidth)
+    return best_bandwidth
+
+
+def calculate_kde(data, grid, resolution):
+    """
+    Calculate Kernel Density Estimation (KDE) on a grid.
+
+    Parameters:
+        data (ndarray): Data points with shape (N, D), where N is the number of points and D is the number of dimensions.
+        grid (list): List of tuples containing (min_value, max_value) for each dimension.
+        resolution (int): Number of points along each axis in the grid.
+
+    Returns:
+        density (ndarray): The density estimation values on the grid.
+        grid_coordinates (ndarray): The coordinates of the grid points.
+    """
+    # Create a Gaussian KDE object
+    bandwidth = estiamte_bandwidth(data)
+    kde = KernelDensity(bandwidth=bandwidth, kernel='gaussian')
+
+    # Fit the KDE model to the data
+    kde.fit(data)
+
+    # Calculate the log probability density for the data points
+    log_density = kde.score_samples(data)
+
+    # Generate slices for each dimension of the grid
+    slices = []
+    for min_val, max_val in grid:
+        slices.append(slice(min_val, max_val, complex(0, resolution)))
+
+    # Generate coordinate arrays using np.mgrid
+    coord_arrays = np.mgrid[tuple(slices)]
+    coord_arrays = np.array(coord_arrays)
+
+    # Stack the grid points for evaluation
+    grid_coordinates = np.vstack([item.ravel() for item in coord_arrays]).T
+
+    # Evaluate the KDE on the grid coordinates and reshape to the grid shape
+    PDF = np.exp(kde.score_samples(grid_coordinates)).reshape(coord_arrays[0].shape)
+
+    return PDF, coord_arrays
 
 
 def deriv_1st(p0, p1, p2, p3, h):
