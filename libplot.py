@@ -2,7 +2,6 @@ def mavi_contour(data):
     from libmath import calculate_kde
     import numpy as np
     from mayavi import mlab
-    import matplotlib.pyplot as plt
 
     # mlab.options.offscreen = True
     # fig = mlab.figure(figure=None)
@@ -14,44 +13,18 @@ def mavi_contour(data):
             ])
 
     xg, yg, zg = grid
-    density, coords = calculate_kde(data, grid, 10)
+    density, coords = calculate_kde(data, grid, 180)
     xi, yi, zi = coords
 
     # Create a white scene background
-    fig = mlab.figure(bgcolor=(1, 1, 1))
-
-    # print(coords, density)
-    mlab.contour3d(xi, yi, zi, density, opacity=0.5)
-
-    color_axes = (0, 0, 0)
-    mlab.axes(
-        fig,  # The Mayavi figure
-        ranges=(xg[0], xg[1], yg[0], yg[1], zg[0], zg[1]),  # Specify the ranges for each axis
-        extent=(xg[0], xg[1], yg[0], yg[1], zg[0], zg[1]),
-        # xlabel='X Label',  # Label for the X axis
-        # ylabel='Y Label',  # Label for the Y axis
-        # zlabel='Z Label',  # Label for the Z axis
-        color=color_axes,    # Axes color
-        line_width=1.0,     # Line width of the axes
-        # nb_labels=5,        # Number of labels on each axis
-    )
-
-    # # Customize Matplotlib style and add labels
-    # title = "Mayavi Scene with Matplotlib Labels"
-    # xlabel, ylabel, zlabel = "X Label", "Y Label", "Z Label"
-    # plt.title(title, color='black', fontsize=16)  # Set title font color and size
-    #
-    # # Create a subplots arrangement with a single subplot (Mayavi scene)
-    # fig, ax = plt.subplots()
-    # ax.set_xlabel(xlabel, color='blue', fontsize=14)  # Set xlabel color and size
-    # ax.set_ylabel(ylabel, color='green', fontsize=14)  # Set ylabel color and size
-    # ax.set_zlabel(zlabel, color='red', fontsize=14)  # Set zlabel color and size
-
+    fig = mlab.figure(fgcolor=(0, 0, 0), bgcolor=(1, 1, 1), size=(963, 963))
 
     # Manually create a bounding box
     xmin, xmax = xg
     ymin, ymax = yg
     zmin, zmax = zg
+
+    color_axes = (0, 0, 0)
 
     mlab.plot3d(
         [xmin, xmax, xmax, xmin, xmin],
@@ -89,12 +62,50 @@ def mavi_contour(data):
         line_width=2.0
     )
 
-    # fig.scene.aspect_ratio = (1, 1, 1)
+    contour = mlab.contour3d(xi, yi, zi, density, opacity=0.5)
 
-    mlab.axes()
-    mlab.show()
-    # mlab.savefig("test.png")
+    # Create a Mayavi text actor for the axes labels
+    ax = mlab.axes(
+        contour,  # The Mayavi figure
+        ranges=(xg[0], xg[1], yg[0], yg[1], zg[0], zg[1]),  # Specify the ranges for each axis
+        extent=(xg[0], xg[1], yg[0], yg[1], zg[0], zg[1]),
+        # xlabel='\u03c6',  # Label for the X axis
+        # ylabel='\u03bf',  # Label for the Y axis
+        # zlabel='\u03ba',  # Label for the Z axis
+        color=color_axes,    # Axes color
+        line_width=1.0,     # Line width of the axes
+        nb_labels=5,        # Number of labels on each axis
+    )
+
+    ax.axes.font_factor = 1
+    ax.axes.label_format = '    %4.0f'
+    ax.axes.x_label = "Phi"
+    ax.axes.y_label = "Xi"
+    ax.axes.z_label = "Chi"
+
+    ax.label_text_property.bold = False
+    ax.label_text_property.italic = False
+    ax.label_text_property.color = (0, 0, 0)
+    ax.label_text_property.font_size = 8
+
+    ax.title_text_property.bold = False
+    ax.title_text_property.italic = False
+    ax.title_text_property.font_size = 8
+    ax.property.color = (0, 0, 0)
+
+    # mlab.axes()
+
+    # Adjust the layout settings for a tight layout
+    fig.scene.disable_render = True  # Disable rendering during layout adjustments
+    mlab.view(30, 30, distance=1300)       # Adjust camera distance
+    mlab.roll(0)                     # Reset camera roll
+    fig.scene.disable_render = False # Re-enable renderingv
+
+    # mlab.savefig("test.png",
+            # size=(600, 600) 
+            # )
     # mlab.close()
+    mlab.show()
 
 
 def debug_geometry(normal1, normal2, point1, point2):
@@ -205,3 +216,168 @@ def debug_geometry(normal1, normal2, point1, point2):
     # Show the plot
     plt.show()
     plt.close()
+
+
+def ramachandran_plot(data, labels, name):
+    """
+    Generate a Ramachandran plot using kernel density estimation (KDE).
+
+    Parameters:
+    data (numpy.ndarray): The data to generate the plot from.
+    labels (list): Labels for the X and Y axes.
+    name (str): The name of the output plot file (without extension).
+
+    Returns:
+    None
+
+    Requires:
+    - libmath.calculate_kde: A function to calculate kernel density estimation.
+    - numpy
+    - matplotlib.pyplot
+    - matplotlib.ticker
+    - matplotlib.font_manager.FontProperties
+
+    """
+    # import necessary libraries and modules
+    from libmath import calculate_kde
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+    from matplotlib.font_manager import FontProperties
+
+    # Define the grid for the contour plot
+    grid = np.array(
+            [[-180, 180],
+             [-180, 180]]
+            )
+    xg, yg = grid
+    xmin, xmax = xg
+    ymin, ymax = yg
+
+    # Calculate kernel density estimation and coordinates
+    density, coords = calculate_kde(data, grid, 180)
+    xi, yi = coords
+
+    # Configure font and font size for the plot
+    plt.rcParams['font.sans-serif'] = "Arial"
+    plt.rcParams['font.size'] = 8
+
+    # Create a new figure
+    plt.figure(figsize=(3.45, 3.45))
+
+    # Create a filled contour plot
+    plt.contourf(
+            xi, yi, density,
+            cmap='Greys',
+            levels=100,
+            )
+
+    # Customize labels and title
+    plt.xlabel(labels[0])
+    plt.ylabel(labels[1])
+
+    # Set the limits of the x and y axes to (-180, 180)
+    plt.xlim(-180, 180)
+    plt.ylim(-180, 180)
+
+    # Customize axes properties
+    plt.gca().spines['bottom'].set_linewidth(0.75)
+    plt.gca().spines['left'].set_linewidth(0.75)
+    plt.gca().spines['top'].set_linewidth(0.75)
+    plt.gca().spines['right'].set_linewidth(0.75)
+
+    # Customize tick parameters for major ticks
+    major_locator = ticker.MultipleLocator(base=60)  # Set major tick every 30 degrees
+    plt.gca().xaxis.set_major_locator(major_locator)
+    plt.gca().yaxis.set_major_locator(major_locator)
+    plt.gca().xaxis.set_tick_params(width=0.75, length=3, direction='out', which='both', top=True)
+    plt.gca().yaxis.set_tick_params(width=0.75, length=3, direction='out', which='both', right=True)
+
+    # Customize tick parameters for minor ticks
+    minor_locator = ticker.MultipleLocator(base=60/4)  # Set minor tick every 10 degrees
+    plt.gca().xaxis.set_minor_locator(minor_locator)
+    plt.gca().yaxis.set_minor_locator(minor_locator)
+    plt.gca().xaxis.set_tick_params(width=0.5, length=1.5, direction='out', which='minor', top=True)
+    plt.gca().yaxis.set_tick_params(width=0.5, length=1.5, direction='out', which='minor', right=True)
+
+    # Ensure a tight layout
+    plt.tight_layout()
+
+    # Save the plot as an image
+    plt.savefig(
+            name+".png",
+            dpi=1000
+            )
+    # Close the plot
+    plt.close()
+
+
+def distribution_plot(data_array, labels, name):
+    # import necessary libraries and modules
+    from libmath import calculate_kde
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+    from matplotlib.font_manager import FontProperties
+
+    data_array = data_array.T
+    num_plots = data_array.shape[0]
+
+    # Configure font and font size for the plot
+    plt.rcParams['font.sans-serif'] = "Arial"
+    plt.rcParams['font.size'] = 8
+
+    # Create a figure and subplots
+    fig, axes = plt.subplots(1, num_plots, figsize=(3.45, 3.45), sharey=True)
+
+    # Set the title for the entire figure
+    # fig.suptitle(title)
+
+    grid = np.array(
+            [[-180, 180]]
+            )
+
+    xg = grid[0]
+    xmin, xmax = xg
+
+
+    for i, (data, label) in enumerate(zip(data_array, labels)):
+        ax = axes[i]
+
+        data = data.reshape(-1, 1)
+        density, coords = calculate_kde(data, grid, 180)
+
+        # Plot the data
+        ax.plot(density, coords[0])
+
+        # Set labels and title for each subplot
+        ax.set_xlabel(label)
+        if i == 0:
+            ax.set_ylabel("Angle distibution")
+
+        # Set the limits of the x and y axes to (-180, 180)
+        plt.ylim(-180, 180)
+
+        # Customize axes properties
+        plt.gca().spines['bottom'].set_linewidth(0.75)
+        plt.gca().spines['left'].set_linewidth(0.75)
+        plt.gca().spines['top'].set_linewidth(0.75)
+        plt.gca().spines['right'].set_linewidth(0.75)
+
+        # Customize tick parameters for major ticks
+        ax.set_xticks([])
+
+        major_locator = ticker.MultipleLocator(base=60)  # Set major tick every 30 degrees
+        plt.gca().yaxis.set_major_locator(major_locator)
+        plt.gca().yaxis.set_tick_params(width=0.75, length=3, direction='out', which='both', right=False)
+
+        # Customize tick parameters for minor ticks
+        minor_locator = ticker.MultipleLocator(base=60/4)  # Set minor tick every 10 degrees
+        plt.gca().yaxis.set_minor_locator(minor_locator)
+        plt.gca().yaxis.set_tick_params(width=0.5, length=1.5, direction='out', which='minor', right=False)
+
+    # Adjust layout to avoid overlapping labels
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+    # Show the plot
+    plt.show()

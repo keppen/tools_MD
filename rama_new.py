@@ -1,4 +1,3 @@
-#!/home/mszatko/.conda/envs/code/bin/python3
 import time
 import math
 import pandas as pd
@@ -6,9 +5,7 @@ import sys
 import numpy as np
 import graph_mol
 import re
-import libplot
 from libread import read_pdb
-from scipy import stats
 from libmath import (
     calculate_dihedral,
     calcLinearRegression_PowerIteration,
@@ -55,7 +52,7 @@ class Visualize:
             self._collectDistance,
         ]
         self.plot_function = [
-            self._rama_plot,
+            self._ramachandran_3d,
             self._hbond_plot,
             self._axis_plot,
             self._contact_plot,
@@ -82,8 +79,8 @@ class Visualize:
             "residue index": self.resids_dihedral,
             "Phi": self.phi,
             "Psi": self.psi,
-            "OmegaPrim": self.omega1,
-            "OmegaBis": self.omega2,
+            "Xi": self.omega1,
+            "Chi": self.omega2,
         }
 
         self.models_geometry = []
@@ -253,9 +250,6 @@ class Visualize:
             )
         self.points_backbone = [p for p in points if p.all()]
 
-    def _estimateBandwidth(self, data: pd.DataFrame):
-        pass
-
     def _collectData(self):
         try:
             self.model, pdb_data = next(self.pdb_gen)
@@ -283,8 +277,8 @@ class Visualize:
             self.resids_dihedral.append(resid)
             self.phi.append(self._calcPhi(self.DF_pdb, resid))
             self.psi.append(self._calcPsi(self.DF_pdb, resid))
-            self.omega1.append(self._calcOmegaPrim(self.DF_pdb, resid))
-            self.omega2.append(self._calcOmegaBis(self.DF_pdb, resid))
+            self.omega1.append(self._calcXi(self.DF_pdb, resid))
+            self.omega2.append(self._calcChi(self.DF_pdb, resid))
 
     def _collectGeometry(self):
         """Calculate dihedrals with data collected from pdb file.
@@ -370,12 +364,6 @@ class Visualize:
         self.DF_dihedrals = pd.DataFrame.from_dict(
             self.dict_dihedral, orient="index"
         ).transpose()
-        from libplot import mavi_contour
-        DF_angles = self.DF_dihedrals[["Phi", "OmegaPrim", "OmegaBis"]]
-        np_angles = DF_angles.to_numpy(dtype=np.float64)
-        mavi_contour(np_angles)
-        # np_angles = np_angles.T
-        # print(np_angles)
 
     def _dataframeHbond(self):
         self.DF_hbond = pd.DataFrame.from_dict(
@@ -448,7 +436,7 @@ class Visualize:
         p4 = self._searchByType(df, resid + 1, "N")
         return calculate_dihedral(p1, p2, p3, p4)
 
-    def _calcOmegaPrim(self, df, resid):
+    def _calcXi(self, df, resid):
         """Helper function"""
         p1 = self._searchByType(df, resid, "N")
         p2 = self._searchByType(df, resid, "CG")
@@ -456,7 +444,7 @@ class Visualize:
         p4 = self._searchByType(df, resid, "OA")
         return calculate_dihedral(p1, p2, p3, p4)
 
-    def _calcOmegaBis(self, df, resid):
+    def _calcChi(self, df, resid):
         """Helper function"""
         p1 = self._searchByType(df, resid, "CG")
         p2 = self._searchByType(df, resid, "CB")
@@ -529,10 +517,33 @@ class Visualize:
         # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
         plt.close()
 
-    def rama_3d(self):
-        pass
+    def _ramachandran_3d(self):
+        from libplot import mavi_contour
 
-    def _rama_plot(self, chirality=None):
+        DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
+        np_angles = DF_angles.to_numpy(dtype=np.float64)
+        mavi_contour(np_angles)
+
+    def _ramachandran_2d(self):
+        from libplot import ramachandran_plot
+        from itertools import combinations
+
+        DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
+        DF_combinations = combinations(DF_angles, 2)
+        for comb in DF_combinations:
+            DF_data = (DF_angles[list(comb)])
+            np_angles = DF_data.to_numpy(dtype=np.float64)
+            ramachandran_plot(np_angles, comb, "test")
+
+    def _ramachandran_1d(self):
+        from libplot import distribution_plot
+
+        DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
+        np_angles = DF_angles.to_numpy(dtype=np.float64)
+
+        distribution_plot(np_angles, DF_angles.columns.tolist(), "test")
+
+    def _ramachandran_depreciated(self, chirality=None):
         """Plots a Ramachandram plot from seaborn.JointGrid provided with pandas.DataFrame.
         3 fieds of grid:
                 center: Ramachandran plot as kernel density plot of angle vs angle 2d plot
@@ -557,8 +568,8 @@ class Visualize:
 
         x = self.DF_dihedrals["Phi"]
         y = [
-            self.DF_dihedrals["OmegaPrim"],
-            self.DF_dihedrals["OmegaBis"],
+            self.DF_dihedrals["Xi"],
+            self.DF_dihedrals["Chi"],
             self.DF_dihedrals["Psi"],
         ]
         hue_order = [4, 3, 2]

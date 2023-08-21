@@ -1,8 +1,9 @@
 import numpy as np
 import itertools
-from sklearn.model_selection import GridSearchCV, LeaveOneOut
+from sklearn.model_selection import GridSearchCV, RepeatedKFold
 # from sklearn.cross_validation import LeaveOneOut
 from sklearn.neighbors import KernelDensity
+from liblogg import timing
 
 
 def calcVector(p0, p1) -> np.array:
@@ -127,12 +128,13 @@ def calculate_dihedral(p0, p1, p2, p3):
     return np.degrees(np.arctan2(sin, cos))
 
 
+@timing
 def estiamte_bandwidth(data):
-    bw = 10 ** np.linspace(-3, 3, 200)
+    bandwidth = 10 ** np.linspace(-3, 2, 100)
     grid = GridSearchCV(
         KernelDensity(kernel="gaussian"),
-        {"bandwidth": bw},
-        cv=LeaveOneOut()
+        {"bandwidth": bandwidth},
+        cv=RepeatedKFold(n_splits=6, n_repeats=4)
     )
     grid.fit(data)
     best_params = grid.best_params_
@@ -141,6 +143,7 @@ def estiamte_bandwidth(data):
     return best_bandwidth
 
 
+@timing
 def calculate_kde(data, grid, resolution):
     """
     Calculate Kernel Density Estimation (KDE) on a grid.
