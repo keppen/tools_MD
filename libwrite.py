@@ -66,3 +66,8 @@ def write_pdb(content, file_name, **options):
     # print(msg)
     file.writelines(msg)
     file.close()
+
+
+def write_log(name, message):
+    with open(name, 'a') as file:
+        file.write(message)

@@ -1,7 +1,6 @@
 import numpy as np
 import itertools
 from sklearn.model_selection import GridSearchCV, RepeatedKFold
-# from sklearn.cross_validation import LeaveOneOut
 from sklearn.neighbors import KernelDensity
 from liblogg import timing
 
@@ -138,7 +137,8 @@ def estiamte_bandwidth(data):
     )
     grid.fit(data)
     best_params = grid.best_params_
-    best_bandwidth = best_params['bandwidth']  # Extract the best bandwidth value
+    # Extract the best bandwidth value
+    best_bandwidth = best_params['bandwidth']
     print(best_bandwidth)
     return best_bandwidth
 
@@ -165,7 +165,7 @@ def calculate_kde(data, grid, resolution):
     kde.fit(data)
 
     # Calculate the log probability density for the data points
-    log_density = kde.score_samples(data)
+    # log_density = kde.score_samples(data)
 
     # Generate slices for each dimension of the grid
     slices = []
@@ -180,7 +180,8 @@ def calculate_kde(data, grid, resolution):
     grid_coordinates = np.vstack([item.ravel() for item in coord_arrays]).T
 
     # Evaluate the KDE on the grid coordinates and reshape to the grid shape
-    PDF = np.exp(kde.score_samples(grid_coordinates)).reshape(coord_arrays[0].shape)
+    PDF = np.exp(kde.score_samples(grid_coordinates)
+                 ).reshape(coord_arrays[0].shape)
 
     return PDF, coord_arrays
 

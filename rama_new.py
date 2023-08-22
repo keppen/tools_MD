@@ -5,7 +5,10 @@ import sys
 import numpy as np
 import graph_mol
 import re
+import os
+from libmath import calculate_kde
 from libread import read_pdb
+from libwrite import write_log
 from libmath import (
     calculate_dihedral,
     calcLinearRegression_PowerIteration,
@@ -23,33 +26,39 @@ class Visualize:
         self,
         structure_pdb,
         cluster_pdb,
+        log_file,
         options="all",
         truncate=None,
         step=None,
-        no_plot=False,
+        no_plot=True,
+        to_csv=True,
     ):
         self.structure_pdb = structure_pdb
         self.cluster_pdb = cluster_pdb
+        self.log_file = log_file
         self.MOL = graph_mol.Molecule()
         self.truncate = int(truncate) if truncate else truncate
         self.options = "dghac" if options == "all" else options
         self.step = int(step) if step else 1
-        self.no_plot = no_plot
 
+        self.no_plot = no_plot
+        self.to_csv = to_csv
         self.no_limit = True
 
         self.DF_pdb: pd.DataFrame
         self.DF_dihedrals: pd.DataFrame
+        self.DF_geometry: pd.DataFrame
         self.DF_hbond: pd.DataFrame
         self.DF_axis: pd.DataFrame
         self.DF_distance: pd.DataFrame
 
+    def _init_functions(self):
         self.runs_function = [
-            self._collectDih,
-            self._collectGeometry,
-            self._collectHbond,
-            self._collectAxis,
-            self._collectDistance,
+            self._get_dih,
+            self._get_geometry,
+            self._get_hbond,
+            self._get_axis,
+            self._get_distance,
         ]
         self.plot_function = [
             self._ramachandran_3d,
@@ -58,15 +67,15 @@ class Visualize:
             self._contact_plot,
         ]
         self.dataframe_funtion = [
-            self._dataframeDihedral,
-            self._dataframeHbond,
-            self._dataframeAxis,
-            self._dataframeDistance,
+            self._dihedral2DF,
+            self._hbond2DF,
+            self._axis2DF,
+            self._distance2DF,
         ]
         self.runs_bool = [
             True if c in self.options else False for c in "dghac"]
 
-    def _initDicts(self):
+    def _init_dicts(self):
         self.models_dihedral = []
         self.resids_dihedral = []
         self.psi = []
@@ -134,37 +143,69 @@ class Visualize:
             "distance": self.distance_distance,
         }
 
-    def _initRun(self):
+    def _init_log(self):
+        if not self.log_file:
+            path = os.path.getcwd + "log_file.log"
+            self.log_file = open(path, 'w')
+            return 0
+        else:
+            log_file = open(self.log_file, 'r')
+            content = log_file.readlines()
+            return content[0].split(';')[0]
+
+    def _update_log(self):
+        run_options = [
+            self.run_id,
+            self.structure_pdb,
+            self.cluster_pdb,
+            self.truncate,
+            self.step,
+            self.plot_type,
+            self.plot_name,
+            self.plot_labels,
+            self.plot_limits,
+            self.plot_resolution,
+            self.data_csv,
+            self.coordinates_csv,
+        ]
+        msg = ';'.join(run_options)
+        write_log(self.log_file, msg)
+
+        self.run_id += 1
+
+    def _init_run(self):
         """Run the calculation and generation of plots"""
-        self._prepareMol()
+        self._prepare_mol()
 
         data = open(self.cluster_pdb, "r")
         self.pdb_gen = read_pdb(data)
 
-        self._initDicts()
+        self._init_dicts()
+        self._init_functions()
+        self.run_id = self._init_log() + 1
         # print(self.MOL.atoms)
 
         if self.step or self.truncate:
-            self._runTruncated()
+            self._run_truncated()
         else:
-            self._runAll()
-        self._mapRuns(self.dataframe_funtion)
+            self._run_all()
+        self._map_runs(self.dataframe_funtion)
 
         if self.no_plot:
             return 1
 
-        self._mapRuns(self.plot_function)
+        self._map_runs(self.plot_function)
 
-    def _runAll(self):
+    def _run_all(self):
         while self.no_limit:
-            self._collectData()
-            self._mapRuns(self.runs_function)
+            self._get_data()
+            self._map_runs(self.runs_function)
             print("MODEL: ", self.model, end="\r")
             # self._printProgress(self.model)
 
-    def _runTruncated(self):
+    def _run_truncated(self):
         while self.no_limit:
-            self._collectData()
+            self._get_data()
 
             if self.model == self.truncate:
                 break
@@ -173,14 +214,14 @@ class Visualize:
 
             # self._printProgress(self.model)
             print("MODEL: ", self.model, end="\r")
-            self._mapRuns(self.runs_function)
+            self._map_runs(self.runs_function)
 
-    def _mapRuns(self, function_list):
+    def _map_runs(self, function_list):
         for condition, function in zip(self.runs_bool, function_list):
             if condition:
                 function()
 
-    def _splitName(self, file):
+    def _split_name(self, file):
         """Split name of file and get the information about analyzed file.
 
         Parameters:
@@ -212,7 +253,7 @@ class Visualize:
         """Helper function"""
         return line.strip().split()
 
-    def _prepareMol(self):
+    def _prepare_mol(self):
         """Helper function"""
         structure = self._read_file(self.structure_pdb)
         for line in structure:
@@ -230,12 +271,12 @@ class Visualize:
         if model >= 1000 and model % 1000 == 0:
             print(f"Collecting model: {model}", end="\r")
 
-    def _centerPoints(self):
+    def _center_points(self):
         points = []
         # for index, row in self.DF_pdb.iterrows():
         #     points.append(np.array([row.x, row.y, row.z]))
         for index in self.MOL.backbone:
-            p = self._searchByIndex(self.DF_pdb, int(index))
+            p = self._search_by_index(self.DF_pdb, int(index))
             points.append(np.array(p))
         geom_center = calcCentroid(points)
 
@@ -250,17 +291,17 @@ class Visualize:
             )
         self.points_backbone = [p for p in points if p.all()]
 
-    def _collectData(self):
+    def _get_data(self):
         try:
             self.model, pdb_data = next(self.pdb_gen)
             # print(pdb_data)
             self.DF_pdb = pd.DataFrame.from_dict(
                 pdb_data, orient="index").transpose()
-            self._centerPoints()
+            self._center_points()
         except StopIteration:
             self.no_limit = False
 
-    def _collectDih(self):
+    def _get_dih(self):
         """Calculate dihedrals with data collected from pdb file.
         Dihedrals are stored in DataFrame object
 
@@ -275,12 +316,12 @@ class Visualize:
         for resid in range(2, max_resid):
             self.models_dihedral.append(self.model)
             self.resids_dihedral.append(resid)
-            self.phi.append(self._calcPhi(self.DF_pdb, resid))
-            self.psi.append(self._calcPsi(self.DF_pdb, resid))
-            self.omega1.append(self._calcXi(self.DF_pdb, resid))
-            self.omega2.append(self._calcChi(self.DF_pdb, resid))
+            self.phi.append(self._calculate_phi(self.DF_pdb, resid))
+            self.psi.append(self._calculate_psi(self.DF_pdb, resid))
+            self.omega1.append(self._calculate_xi(self.DF_pdb, resid))
+            self.omega2.append(self._calculate_chi(self.DF_pdb, resid))
 
-    def _collectGeometry(self):
+    def _get_geometry(self):
         """Calculate dihedrals with data collected from pdb file.
         Dihedrals are stored in DataFrame object
 
@@ -297,8 +338,9 @@ class Visualize:
         res0 = None
         res1 = None
         for resid in range(2, max_resid):
-            res0 = res1 or self._calcPlane_and_Geomcentre(self.DF_pdb, resid)
-            res1 = self._calcPlane_and_Geomcentre(self.DF_pdb, resid + 1)
+            res0 = res1 or self._calculate_plane_and_geomcentre(
+                self.DF_pdb, resid)
+            res1 = self._calculate_plane_and_geomcentre(self.DF_pdb, resid + 1)
             a = calcAngle(res0[0], res1[0])
             a = np.degrees(math.acos(a))
             line = calcVector(res0[1], res1[1])
@@ -317,12 +359,13 @@ class Visualize:
 
             # libplot.debug_geometry(res0[0], res1[0], res0[1], res1[1])
 
-    def _collectHbond(self):
+    def _get_hbond(self):
         max_resid = self.DF_pdb.max()["residue_seqnumber"]
 
         for acceptor in range(2, max_resid + 1):
             for donor in range(1, max_resid):
-                angle, lenght = self._calcHbond(self.DF_pdb, acceptor, donor)
+                angle, lenght = self._calculate_hbond(
+                    self.DF_pdb, acceptor, donor)
                 angle = math.acos(angle) / math.pi * 180
                 self.models_hbond.append(self.model)
                 self.resid_acceptor.append(acceptor)
@@ -330,17 +373,17 @@ class Visualize:
                 self.angle.append(angle)
                 self.lenght.append(lenght)
 
-    def _collectAxis(self):
+    def _get_axis(self):
         self.axis = calcLinearRegression_PowerIteration(self.points_backbone)
         for index in self.MOL.backbone:
             self.models_axis.append(self.model)
-            point = self._searchByIndex(self.DF_pdb, int(index))
+            point = self._search_by_index(self.DF_pdb, int(index))
             self.distance_axis.append(
                 calcDistance_form_Vector(point, self.axis))
             self.index.append(self.MOL.backbone.index(index))
             self.resids_axis.append(self.MOL._findbyID(index)["resid"])
 
-    def _collectDistance(self):
+    def _get_distance(self):
         atoms_indexes = []
         for index in self.MOL.backbone:
             atom = self.DF_pdb.loc[
@@ -352,20 +395,20 @@ class Visualize:
 
         for index_1, atom_id_1 in enumerate(atoms_indexes):
             for index_2, atom_id_2 in enumerate(atoms_indexes):
-                atom_1 = self._searchByIndex(self.DF_pdb, int(atom_id_1))
-                atom_2 = self._searchByIndex(self.DF_pdb, int(atom_id_2))
+                atom_1 = self._search_by_index(self.DF_pdb, int(atom_id_1))
+                atom_2 = self._search_by_index(self.DF_pdb, int(atom_id_2))
                 distance = np.linalg.norm(np.array(atom_1) - np.array(atom_2))
                 self.models_distance.append(self.model)
                 self.index_distance_1.append(index_1)
                 self.index_distance_2.append(index_2)
                 self.distance_distance.append(distance)
 
-    def _dataframeDihedral(self):
+    def _dihedral2DF(self):
         self.DF_dihedrals = pd.DataFrame.from_dict(
             self.dict_dihedral, orient="index"
         ).transpose()
 
-    def _dataframeHbond(self):
+    def _hbond2DF(self):
         self.DF_hbond = pd.DataFrame.from_dict(
             self.dict_hbond, orient="index"
         ).transpose()
@@ -381,12 +424,12 @@ class Visualize:
             aggfunc=np.mean,
         )
 
-    def _dataframeAxis(self):
+    def _axis2DF(self):
         self.DF_axis = pd.DataFrame.from_dict(
             self.dict_axis, orient="index"
         ).transpose()
 
-    def _dataframeDistance(self):
+    def _distance2DF(self):
         self.DF_distance = pd.DataFrame.from_dict(
             self.dict_distance, orient="index"
         ).transpose()
@@ -398,7 +441,7 @@ class Visualize:
             aggfunc=np.mean,
         )
 
-    def _searchByType(self, df_model, resid, atom_type):
+    def _search_by_type(self, df_model, resid, atom_type):
         """Helper function"""
         p = df_model.loc[
             # (df_model['model'] == model) &
@@ -409,7 +452,7 @@ class Visualize:
         #     print(f'{a}: {b}')
         return [float(p.iat[0, 7]), float(p.iat[0, 8]), float(p.iat[0, 9])]
 
-    def _searchByIndex(self, df_model, index):
+    def _search_by_index(self, df_model, index):
         """Helper function"""
         p = df_model.loc[
             # (df_model['model'] == model) &
@@ -420,51 +463,51 @@ class Visualize:
         #     print(f'{a}: {b}')
         return [float(p.iat[0, 7]), float(p.iat[0, 8]), float(p.iat[0, 9])]
 
-    def _calcPhi(self, df, resid):
+    def _calculate_phi(self, df, resid):
         """Helper function"""
-        p1 = self._searchByType(df, resid - 1, "C")
-        p2 = self._searchByType(df, resid, "N")
-        p3 = self._searchByType(df, resid, "CG")
-        p4 = self._searchByType(df, resid, "CB")
+        p1 = self._search_by_type(df, resid - 1, "C")
+        p2 = self._search_by_type(df, resid, "N")
+        p3 = self._search_by_type(df, resid, "CG")
+        p4 = self._search_by_type(df, resid, "CB")
         return calculate_dihedral(p1, p2, p3, p4)
 
-    def _calcPsi(self, df, resid):
+    def _calculate_psi(self, df, resid):
         """Helper function"""
-        p1 = self._searchByType(df, resid, "CB")
-        p2 = self._searchByType(df, resid, "OA")
-        p3 = self._searchByType(df, resid, "C")
-        p4 = self._searchByType(df, resid + 1, "N")
+        p1 = self._search_by_type(df, resid, "CB")
+        p2 = self._search_by_type(df, resid, "OA")
+        p3 = self._search_by_type(df, resid, "C")
+        p4 = self._search_by_type(df, resid + 1, "N")
         return calculate_dihedral(p1, p2, p3, p4)
 
-    def _calcXi(self, df, resid):
+    def _calculate_xi(self, df, resid):
         """Helper function"""
-        p1 = self._searchByType(df, resid, "N")
-        p2 = self._searchByType(df, resid, "CG")
-        p3 = self._searchByType(df, resid, "CB")
-        p4 = self._searchByType(df, resid, "OA")
+        p1 = self._search_by_type(df, resid, "N")
+        p2 = self._search_by_type(df, resid, "CG")
+        p3 = self._search_by_type(df, resid, "CB")
+        p4 = self._search_by_type(df, resid, "OA")
         return calculate_dihedral(p1, p2, p3, p4)
 
-    def _calcChi(self, df, resid):
+    def _calculate_chi(self, df, resid):
         """Helper function"""
-        p1 = self._searchByType(df, resid, "CG")
-        p2 = self._searchByType(df, resid, "CB")
-        p3 = self._searchByType(df, resid, "OA")
-        p4 = self._searchByType(df, resid, "C")
+        p1 = self._search_by_type(df, resid, "CG")
+        p2 = self._search_by_type(df, resid, "CB")
+        p3 = self._search_by_type(df, resid, "OA")
+        p4 = self._search_by_type(df, resid, "C")
         return calculate_dihedral(p1, p2, p3, p4)
 
-    def _calcPlane_and_Geomcentre(self, df, resid):
-        p0 = self._searchByType(df, resid - 1, "O")
-        p1 = self._searchByType(df, resid - 1, "OA")
-        p2 = self._searchByType(df, resid, "N")
-        p3 = self._searchByType(df, resid - 1, "C")
+    def _calculate_plane_and_geomcentre(self, df, resid):
+        p0 = self._search_by_type(df, resid - 1, "O")
+        p1 = self._search_by_type(df, resid - 1, "OA")
+        p2 = self._search_by_type(df, resid, "N")
+        p3 = self._search_by_type(df, resid - 1, "C")
         # print(p0, p1, p2, p3)
         return calcPlane(p0, p2, p1), p3
 
-    def _calcHbond(self, df, acceptor, donor):
-        p0 = self._searchByType(df, acceptor, "N")
-        p1 = self._searchByType(df, acceptor - 1, "C")
-        p2 = self._searchByType(df, acceptor, "CG")
-        p3 = self._searchByType(df, donor, "O")
+    def _calculate_hbond(self, df, acceptor, donor):
+        p0 = self._search_by_type(df, acceptor, "N")
+        p1 = self._search_by_type(df, acceptor - 1, "C")
+        p2 = self._search_by_type(df, acceptor, "CG")
+        p3 = self._search_by_type(df, donor, "O")
         p4 = calcMiddlePoint(p1, p2)
         line1 = calcVector(p4, p0)
         line2 = calcVector(p0, p3)
@@ -474,7 +517,7 @@ class Visualize:
         import seaborn as sb
         import matplotlib.pyplot as plt
 
-        name, cluster = self._splitName(self.cluster_pdb)
+        name, cluster = self._split_name(self.cluster_pdb)
 
         sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
 
@@ -497,7 +540,7 @@ class Visualize:
     def _contact_plot(self):
         import seaborn as sb
         import matplotlib.pyplot as plt
-        name, cluster = self._splitName(self.cluster_pdb)
+        name, cluster = self._split_name(self.cluster_pdb)
 
         sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
 
@@ -519,21 +562,78 @@ class Visualize:
 
     def _ramachandran_3d(self):
         from libplot import mavi_contour
+        from intertools import chain
 
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
         np_angles = DF_angles.to_numpy(dtype=np.float64)
-        mavi_contour(np_angles)
+
+        grid = np.array([
+            [-180, 180],
+            [-180, 180],
+            [-180, 180]
+        ])
+        resolution = 180
+        name = "test"
+        labels = DF_angles.columns.tolist()
+
+        density, coordinates = calculate_kde(np_angles, grid, resolution)
+
+        if self.to_csv:
+            self.data_csv = f"{self.run_id}_data.csv"
+            self.coordianates = f"{self.run_id}_coords.csv"
+
+            data_csv = pd.DataFrame(density)
+            data_csv.to_csv(self.data_csv)
+            coordinates_csv = pd.DataFrame(coordinates)
+            coordinates_csv.to_csv(self.coordinates_csv)
+
+            self.plot_type = "rama_3d"
+            self.plot_name = name
+            self.plot_labels = " ".join(labels)
+            self.plot_limits = " ".join(chain(*grid))
+            self.plot_resolution = resolution
+
+            self._update_log()
+
+        if self.no_plot:
+            mavi_contour(density, coordinates, limits=grid,
+                         name=name, labels=labels)
 
     def _ramachandran_2d(self):
         from libplot import ramachandran_plot
-        from itertools import combinations
+        from itertools import combinations, chain
 
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
         DF_combinations = combinations(DF_angles, 2)
+
+        grid = np.array(
+            [[-180, 180],
+             [-180, 180]]
+        )
+
+        resolution = 180
+
         for comb in DF_combinations:
             DF_data = (DF_angles[list(comb)])
             np_angles = DF_data.to_numpy(dtype=np.float64)
-            ramachandran_plot(np_angles, comb, "test")
+
+            name = f"test-{''.join(comb)}"
+            labels = DF_angles.columns.tolist()
+
+            density, coordinates = calculate_kde(np_angles, grid, resolution)
+
+            if self.to_csv:
+                self.plot_type = "rama_2d"
+                self.plot_name = name
+                self.plot_labels = " ".join(labels)
+                self.plot_limits = " ".join(chain(*grid))
+                self.plot_resolution = resolution
+                self.data_csv = f"{self.run_id}_data.csv"
+                self.coordianates = f"{self.run_id}_coords.csv"
+                self._update_log()
+
+            if self.no_plot:
+                ramachandran_plot(np_angles, comb, "test", grid, resolution)
 
     def _ramachandran_1d(self):
         from libplot import distribution_plot
@@ -541,7 +641,13 @@ class Visualize:
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
         np_angles = DF_angles.to_numpy(dtype=np.float64)
 
-        distribution_plot(np_angles, DF_angles.columns.tolist(), "test")
+        grid = np.array(
+            [[-180, 180]]
+        )
+        resolution = 180
+
+        distribution_plot(np_angles, DF_angles.columns.tolist(),
+                          "test", grid, resolution)
 
     def _ramachandran_depreciated(self, chirality=None):
         """Plots a Ramachandram plot from seaborn.JointGrid provided with pandas.DataFrame.
@@ -555,7 +661,7 @@ class Visualize:
         import seaborn as sb
         import matplotlib.pyplot as plt
         print("INFO: Starting plotting")
-        name, cluster = self._splitName(self.cluster_pdb)
+        name, cluster = self._split_name(self.cluster_pdb)
         if chirality is None:
             n = int(self.DF_dihedrals.max()["residue index"]) - 1
             chirality = ["S"] * n
@@ -640,11 +746,11 @@ class Visualize:
                 f'INFO: {letters["latin"][i]}_{name}_{cluster}.png has been generated'
             )
 
-    def _geom_plot(self):
+    def _geometry_plot(self):
         import seaborn as sb
         import matplotlib.pyplot as plt
 
-        name, cluster = self._splitName(self.cluster_pdb)
+        name, cluster = self._split_name(self.cluster_pdb)
 
         letters = {
             "greek": ["\u03b1", "\u03b8\u2081", "\u03b8\u2082"],
@@ -699,7 +805,7 @@ class Visualize:
         import seaborn as sb
         import matplotlib.pyplot as plt
 
-        name, cluster = self._splitName(self.cluster_pdb)
+        name, cluster = self._split_name(self.cluster_pdb)
 
         plot = sb.lineplot(data=self.DF_axis, x="index",
                            y="distance", marker="o")
@@ -733,7 +839,7 @@ if __name__ == "__main__":
         options=options,
         no_plot=no_plot
     )
-    R._initRun()
+    R._init_run()
 
     # R._collectDih()
     # R._rama_plot()

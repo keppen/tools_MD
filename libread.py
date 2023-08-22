@@ -33,6 +33,10 @@ def str2int(list):
     return [float(item) for item in list]
 
 
+def read_log_plot(file_content):
+    pass
+
+
 def read_xyz(file_content):
     while True:
         n = 0
