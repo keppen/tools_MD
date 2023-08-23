@@ -70,4 +70,4 @@ def write_pdb(content, file_name, **options):
 
 def write_log(name, message):
     with open(name, 'a') as file:
-        file.write(message)
+        file.write(message + '\n')
