@@ -101,8 +101,8 @@ def mavi_contour(data, coordinates, limits=None, name="test", labels=None):
 
 
 def debug_geometry(normal1, normal2, point1, point2):
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
     from mpl_toolkits.mplot3d import Axes3D
 
     Axes3D.text()
@@ -212,6 +212,8 @@ def debug_geometry(normal1, normal2, point1, point2):
     # Show the plot
     plt.show()
     plt.close()
+
+
 def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
     """
     Generate a Ramachandran plot using kernel density estimation (KDE).
@@ -225,15 +227,11 @@ def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
     None
 
     Requires:
-    - libmath.calculate_kde: A function to calculate kernel density estimation.
     - numpy
     - matplotlib.pyplot
     - matplotlib.ticker
-    - matplotlib.font_manager.FontProperties
-
     """
     # import necessary libraries and modules
-    from libmath import calculate_kde
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
 
@@ -242,10 +240,6 @@ def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
     xg, yg = limits
     xmin, xmax = xg
     ymin, ymax = yg
-
-    # Calculate kernel density estimation and coordinates
-    density, coords = calculate_kde(data, limits, resolution)
-    xi, yi = coords
 
     # Configure font and font size for the plot
     plt.rcParams['font.sans-serif'] = "Arial"
@@ -256,7 +250,9 @@ def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
 
     # Create a filled contour plot
     plt.contourf(
-        xi, yi, density,
+        coordiantes[0],
+        coordiantes[1],
+        data,
         cmap='Greys',
         levels=100,
     )
@@ -309,9 +305,10 @@ def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
 
 def distribution_plot(data, coordinates,  limits=None, name=None, labels=None):
     # import necessary libraries and modules
-    from libmath import calculate_kde
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
+
+    from libmath import calculate_kde
 
     data_array = data.T
     num_plots = data_array.shape[0]

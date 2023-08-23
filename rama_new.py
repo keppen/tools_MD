@@ -111,16 +111,16 @@ class Visualize:
             self._distance2DF,
         ]
         self.rama_function = [
-                self._ramachandran_1d,
-                self._ramachandran_2d,
-                self._ramachandran_3d,
-                ]
+            self._do_rama_1d,
+            self._do_rama_2d,
+            self._do_rama_3d,
+        ]
         self.runs_bool = [
             True if c in self.options else False for c in "dghac"
-            ]
+        ]
         self.rama_bool = [
-                True if c in self.options else False for c in "123"
-                ]
+            True if c in self.options else False for c in "123"
+        ]
 
     def _init_dicts(self):
         self.models_dihedral = []
@@ -458,10 +458,16 @@ class Visualize:
             self.dict_dihedral, orient="index"
         ).transpose()
 
+    def _geometry2DF(self):
+        self.DF_geometry = pd.DataFrame.from_dict(
+            self.dict_dihedral, orient="index"
+        ).transpose()
+
     def _hbond2DF(self):
         self.DF_hbond = pd.DataFrame.from_dict(
             self.dict_hbond, orient="index"
         ).transpose()
+
         self.DF_hbond["Hbond presence"] = np.where(
             (self.DF_hbond["angle"] <= 30) & (
                 self.DF_hbond["lenght"] <= 3.5), 1, 0
@@ -610,7 +616,7 @@ class Visualize:
         # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
         plt.close()
 
-    def _ramachandran_3d(self):
+    def _do_rama_3d(self):
         from intertools import chain
         from libplot import mavi_contour
 
@@ -633,10 +639,10 @@ class Visualize:
             self.data_npz = f"{self.run_id}_data.npz"
 
             np.savez_compressed(
-                    self.data_npz,
-                    data=density,
-                    coords=coordinates
-                    )
+                self.data_npz,
+                data=density,
+                coords=coordinates
+            )
 
             self.plot_type = "rama_3d"
             self.plot_name = name
@@ -650,7 +656,7 @@ class Visualize:
             mavi_contour(density, coordinates, limits=grid,
                          name=name, labels=labels)
 
-    def _ramachandran_2d(self):
+    def _do_rama_2d(self):
         from itertools import chain, combinations
 
         from libplot import ramachandran_plot
@@ -679,10 +685,10 @@ class Visualize:
                 self.data_npz = f"{self.run_id}_data.npz"
 
                 np.savez_compressed(
-                        self.data_npz,
-                        data=density,
-                        coords=coordinates
-                        )
+                    self.data_npz,
+                    data=density,
+                    coords=coordinates
+                )
 
                 self.plot_type = "rama_2d"
                 self.plot_name = name
@@ -696,7 +702,7 @@ class Visualize:
                 ramachandran_plot(density, coordinates,
                                   name=name, limits=grid, labels=labels)
 
-    def _ramachandran_1d(self):
+    def _do_rama_1d(self):
         from libplot import distribution_plot
 
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
