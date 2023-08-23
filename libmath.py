@@ -133,13 +133,14 @@ def estiamte_bandwidth(data):
     grid = GridSearchCV(
         KernelDensity(kernel="gaussian"),
         {"bandwidth": bandwidth},
-        cv=RepeatedKFold(n_splits=6, n_repeats=4)
+        cv=RepeatedKFold(n_splits=6, n_repeats=3),
+        n_jobs=-2
     )
     grid.fit(data)
     best_params = grid.best_params_
     # Extract the best bandwidth value
     best_bandwidth = best_params['bandwidth']
-    print(best_bandwidth)
+    print("Bandwidth estiamtion: ", best_bandwidth)
     return best_bandwidth
 
 

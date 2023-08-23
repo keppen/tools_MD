@@ -1,0 +1,6 @@
+__pycache__/
+testing/
+*.pdb
+*.log
+*.vpz
+*.png

@@ -297,7 +297,7 @@ def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
     # Save the plot as an image
     plt.savefig(
         name+".png",
-        dpi=1000
+        dpi=1200
     )
     # Close the plot
     plt.close()

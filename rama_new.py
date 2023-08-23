@@ -201,7 +201,7 @@ class Visualize:
             file = open(self.log_file, 'r')
             content = file.readlines()
             file.close()
-            return content[0].split(';')[0]
+            return content[-1].split(';')[0]
 
     def _update_log(self):
         run_options = [
@@ -217,7 +217,7 @@ class Visualize:
             self.plot_resolution,
             self.data_npz,
         ]
-        print(run_options)
+        # print(run_options)
         msg = ';'.join([str(i) for i in run_options])
         write_log(self.log_file, msg)
 
@@ -239,9 +239,9 @@ class Visualize:
             self._run_truncated()
         else:
             self._run_all()
-        self._map_runs(self.dataframe_funtion)
+        self._map_runs(self.dataframe_funtion, self.runs_bool)
 
-        self._map_runs(self.calculation_function)
+        self._map_runs(self.calculation_function, self.runs_bool)
 
     def _run_all(self):
         while self.no_limit:
@@ -789,8 +789,8 @@ if __name__ == "__main__":
     truncate = None
     options = None
     step = None
-    no_plot = None
-    to_csv = None
+    no_plot = True
+    to_csv =  True
     log_file = None
     structure = None
     cluster = None
