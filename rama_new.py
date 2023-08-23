@@ -1,24 +1,26 @@
-import time
 import math
-import pandas as pd
-import sys
-import numpy as np
-import graph_mol
-import re
 import os
-from libmath import calculate_kde
+import re
+import sys
+import time
+
+import numpy as np
+import pandas as pd
+
+import graph_mol
+from libmath import (
+    calcAngle,
+    calcCentroid,
+    calcDistance_form_Vector,
+    calcLinearRegression_PowerIteration,
+    calcMiddlePoint,
+    calcPlane,
+    calculate_dihedral,
+    calculate_kde,
+    calcVector,
+)
 from libread import read_pdb
 from libwrite import write_log
-from libmath import (
-    calculate_dihedral,
-    calcLinearRegression_PowerIteration,
-    calcDistance_form_Vector,
-    calcCentroid,
-    calcPlane,
-    calcAngle,
-    calcVector,
-    calcMiddlePoint,
-)
 
 
 class Visualize:
@@ -26,13 +28,47 @@ class Visualize:
         self,
         structure_pdb,
         cluster_pdb,
-        log_file="log_file.log",
+        log_file=None,
         options="all",
         truncate=None,
         step=None,
         no_plot=True,
         to_csv=True,
     ):
+        """
+        Initialize the Visualize class.
+
+        Parameters:
+            -s, --structure | structure_pdb (str): Path to the PDB file
+                    containing the structure data.
+            -c, --cluster   | cluster_pdb (str): Path to the PDB file
+                    containing cluster data.
+            -l, --log-file  | log_file (str): Path to the log file for
+                    storing analysis information.
+            -o, --options   | options (str, optional): Options for data
+                    analysis. Default is "all".
+                    d - angle statistics:
+                        1 - 1d dihedral angles distribtion analysis
+                        2 - 2d dihedral angles distribtion analysis
+                        3 - 3d dihedral angles distribtion analysis
+                        Ex. "d1" does 1d Ramachandran 1d,
+                        "d23" to do 2d and 3d Ramachandran.
+                    g - spatial group arrangament analysis
+                    h - hydrogen bonds matrix
+                    a - helix axis derivation
+                    c - contact map
+                    It works just like tar options. "d23ch" will run 2d and 3d
+                    dihedral distribtions, hbond matrix and contact map. Order
+                    does not matter.
+            -t, --truncate  | truncate (int, optional): Model index to truncate
+                    data collection.
+            --step          | step (int, optional): Step size for collecting
+                    data.
+            --no-plot       | no_plot (bool, optional): If True, suppress
+                    plotting. Default is True.
+            --no-csv        | to_csv (bool, optional): If True, store data in
+                    CSV files. Default is True.
+        """
         self.structure_pdb = structure_pdb
         self.cluster_pdb = cluster_pdb
         self.log_file = log_file
@@ -60,20 +96,31 @@ class Visualize:
             self._get_axis,
             self._get_distance,
         ]
-        self.plot_function = [
-            self._ramachandran_3d,
-            self._hbond_plot,
-            self._axis_plot,
-            self._contact_plot,
+        self.calculation_function = [
+            self._do_ramachandran,
+            self._do_geometry,
+            self._do_hbond,
+            self._do_axis,
+            self._do_contact,
         ]
         self.dataframe_funtion = [
             self._dihedral2DF,
+            self._geometry2DF,
             self._hbond2DF,
             self._axis2DF,
             self._distance2DF,
         ]
+        self.rama_function = [
+                self._ramachandran_1d,
+                self._ramachandran_2d,
+                self._ramachandran_3d,
+                ]
         self.runs_bool = [
-            True if c in self.options else False for c in "dghac"]
+            True if c in self.options else False for c in "dghac"
+            ]
+        self.rama_bool = [
+                True if c in self.options else False for c in "123"
+                ]
 
     def _init_dicts(self):
         self.models_dihedral = []
@@ -194,15 +241,12 @@ class Visualize:
             self._run_all()
         self._map_runs(self.dataframe_funtion)
 
-        if self.no_plot:
-            return 1
-
-        self._map_runs(self.plot_function)
+        self._map_runs(self.calculation_function)
 
     def _run_all(self):
         while self.no_limit:
             self._get_data()
-            self._map_runs(self.runs_function)
+            self._map_runs(self.runs_function, self.runs_bool)
             print("MODEL: ", self.model, end="\r")
             # self._printProgress(self.model)
 
@@ -217,10 +261,13 @@ class Visualize:
 
             # self._printProgress(self.model)
             print("MODEL: ", self.model, end="\r")
-            self._map_runs(self.runs_function)
+            self._map_runs(self.runs_function, self.runs_bool)
 
-    def _map_runs(self, function_list):
-        for condition, function in zip(self.runs_bool, function_list):
+    def _do_ramachandran(self):
+        self._map_runs(self.rama_function, self.rama_bool)
+
+    def _map_runs(self, function_list, bool_list):
+        for condition, function in zip(bool_list, function_list):
             if condition:
                 function()
 
@@ -516,9 +563,9 @@ class Visualize:
         line2 = calcVector(p0, p3)
         return calcAngle(line1, line2), np.linalg.norm(line2)
 
-    def _hbond_plot(self):
-        import seaborn as sb
+    def _do_hbond(self):
         import matplotlib.pyplot as plt
+        import seaborn as sb
 
         name, cluster = self._split_name(self.cluster_pdb)
 
@@ -540,9 +587,9 @@ class Visualize:
         # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
         plt.close()
 
-    def _contact_plot(self):
-        import seaborn as sb
+    def _do_contact(self):
         import matplotlib.pyplot as plt
+        import seaborn as sb
         name, cluster = self._split_name(self.cluster_pdb)
 
         sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
@@ -564,8 +611,8 @@ class Visualize:
         plt.close()
 
     def _ramachandran_3d(self):
+        from intertools import chain
         from libplot import mavi_contour
-        from itertools import chain
 
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
         np_angles = DF_angles.to_numpy(dtype=np.float64)
@@ -599,13 +646,14 @@ class Visualize:
 
             self._update_log()
 
-        if self.no_plot:
+        if not self.no_plot:
             mavi_contour(density, coordinates, limits=grid,
                          name=name, labels=labels)
 
     def _ramachandran_2d(self):
+        from itertools import chain, combinations
+
         from libplot import ramachandran_plot
-        from itertools import combinations, chain
 
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
         DF_combinations = combinations(DF_angles, 2)
@@ -644,8 +692,9 @@ class Visualize:
 
                 self._update_log()
 
-            if self.no_plot:
-                ramachandran_plot(np_angles, comb, "test", grid, resolution)
+            if not self.no_plot:
+                ramachandran_plot(density, coordinates,
+                                  name=name, limits=grid, labels=labels)
 
     def _ramachandran_1d(self):
         from libplot import distribution_plot
@@ -661,9 +710,9 @@ class Visualize:
         distribution_plot(np_angles, DF_angles.columns.tolist(),
                           "test", grid, resolution)
 
-    def _geometry_plot(self):
-        import seaborn as sb
+    def _do_geometry(self):
         import matplotlib.pyplot as plt
+        import seaborn as sb
 
         name, cluster = self._split_name(self.cluster_pdb)
 
@@ -716,9 +765,9 @@ class Visualize:
         fig.savefig(f"geom_{name}_{cluster}.png", dpi=500)
         plt.close()
 
-    def _axis_plot(self):
-        import seaborn as sb
+    def _do_axis(self):
         import matplotlib.pyplot as plt
+        import seaborn as sb
 
         name, cluster = self._split_name(self.cluster_pdb)
 
@@ -732,9 +781,13 @@ if __name__ == "__main__":
     print(sys.argv)
 
     truncate = None
-    options = "all"
+    options = None
     step = None
-    no_plot = False
+    no_plot = None
+    to_csv = None
+    log_file = None
+    structure = None
+    cluster = None
 
     start_time = time.time()
     for index, arg in enumerate(sys.argv):
@@ -742,17 +795,28 @@ if __name__ == "__main__":
             truncate = sys.argv[index + 1]
         if arg in ["-o", "--options"]:
             options = sys.argv[index + 1]
-        if arg in ["-s", "--step"]:
+        if arg in ["--step"]:
             step = sys.argv[index + 1]
         if arg in ["--no-plot"]:
             no_plot = True
+        if arg in ["-l", "--log-file"]:
+            log_file = sys.argv[index + 1]
+        if arg in ["-s", "--structure"]:
+            structure = sys.argv[index + 1]
+        if arg in ["-c", "--cluster"]:
+            cluster = sys.argv[index + 1]
+        if arg in ["--no-csv"]:
+            to_csv = False
+
     R = Visualize(
-        sys.argv[1],
-        sys.argv[2],
+        structure,
+        cluster,
         truncate=truncate,
         step=step,
         options=options,
-        no_plot=no_plot
+        no_plot=no_plot,
+        to_csv=to_csv,
+        log_file=log_file
     )
     R._init_run()
 

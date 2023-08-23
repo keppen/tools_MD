@@ -1,0 +1,4 @@
+##[pylyzer] failed /home/keppen/Code/tools_MD/liblogg.py 1692688432 600
+.time = pyimport "time"
+
+.timing: (func: (Obj) -> Never) -> () -> Never
