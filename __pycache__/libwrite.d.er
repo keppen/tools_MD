@@ -1,0 +1,5 @@
+##[pylyzer] failed /home/keppen/Code/tools_MD/libwrite.py 1692694594 2477
+.keep_duplicate: |K: Type, Type_2 <: Structural({.split = (self: Type_2, Type_31) -> Self}), Type_31 :> {"."}, Type_2 <: Structural({.split = (self: Obj, Type_31) -> Self}), V: Type, Self <: Indexable(K, V)|(file_name: Type_2) -> NoneType
+.write_xyz: |Type_5 <: Structural({.__len__ = (self: Never) -> Nat})|(coordinates: Type_5, names: Obj, file_name: PathLike) -> NoneType
+.write_pdb: (content: Iterable(Iterable(Never)), file_name: PathLike) -> Never
+.write_log: (name: PathLike, message: Obj) -> Never
