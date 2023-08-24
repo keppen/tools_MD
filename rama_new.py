@@ -24,6 +24,41 @@ from libwrite import write_log
 
 
 class Visualize:
+    """
+Initialize the Visualize class.
+
+Parameters:
+    -s, --structure | structure_pdb (str): Path to the PDB file
+            containing the structure data.
+    -c, --cluster   | cluster_pdb (str): Path to the PDB file
+            containing cluster data.
+    -l, --log-file  | log_file (str): Path to the log file for
+            storing analysis information.
+    -o, --options   | options (str, optional): Options for data
+            analysis. Default is "all".
+            d - angle statistics:
+                1 - 1d dihedral angles distribtion analysis
+                2 - 2d dihedral angles distribtion analysis
+                3 - 3d dihedral angles distribtion analysis
+                Ex. "d1" does 1d Ramachandran 1d,
+                "d23" to do 2d and 3d Ramachandran.
+            g - spatial group arrangament analysis
+            h - hydrogen bonds matrix
+            a - helix axis derivation
+            c - contact map
+            It works just like tar options. "d23ch" will run 2d and 3d
+            dihedral distribtions, hbond matrix and contact map. Order
+            does not matter.
+    -t, --truncate  | truncate (int, optional): Model index to truncate
+            data collection.
+    --step          | step (int, optional): Step size for collecting
+            data.
+    --no-plot       | no_plot (bool, optional): If True, suppress
+            plotting. Default is True.
+    --no-csv        | to_csv (bool, optional): If True, store data in
+            CSV files. Default is True.
+"""
+
     def __init__(
         self,
         structure_pdb,
@@ -37,37 +72,6 @@ class Visualize:
     ):
         """
         Initialize the Visualize class.
-
-        Parameters:
-            -s, --structure | structure_pdb (str): Path to the PDB file
-                    containing the structure data.
-            -c, --cluster   | cluster_pdb (str): Path to the PDB file
-                    containing cluster data.
-            -l, --log-file  | log_file (str): Path to the log file for
-                    storing analysis information.
-            -o, --options   | options (str, optional): Options for data
-                    analysis. Default is "all".
-                    d - angle statistics:
-                        1 - 1d dihedral angles distribtion analysis
-                        2 - 2d dihedral angles distribtion analysis
-                        3 - 3d dihedral angles distribtion analysis
-                        Ex. "d1" does 1d Ramachandran 1d,
-                        "d23" to do 2d and 3d Ramachandran.
-                    g - spatial group arrangament analysis
-                    h - hydrogen bonds matrix
-                    a - helix axis derivation
-                    c - contact map
-                    It works just like tar options. "d23ch" will run 2d and 3d
-                    dihedral distribtions, hbond matrix and contact map. Order
-                    does not matter.
-            -t, --truncate  | truncate (int, optional): Model index to truncate
-                    data collection.
-            --step          | step (int, optional): Step size for collecting
-                    data.
-            --no-plot       | no_plot (bool, optional): If True, suppress
-                    plotting. Default is True.
-            --no-csv        | to_csv (bool, optional): If True, store data in
-                    CSV files. Default is True.
         """
         self.structure_pdb = structure_pdb
         self.cluster_pdb = cluster_pdb
@@ -205,7 +209,7 @@ class Visualize:
 
     def _update_log(self):
         run_options = [
-            self.run_id,
+            self.data_id,
             self.structure_pdb,
             self.cluster_pdb,
             self.truncate,
@@ -221,7 +225,7 @@ class Visualize:
         msg = ';'.join([str(i) for i in run_options])
         write_log(self.log_file, msg)
 
-        self.run_id += 1
+        self.data_id += 1
 
     def _init_run(self):
         """Run the calculation and generation of plots"""
@@ -232,7 +236,7 @@ class Visualize:
 
         self._init_dicts()
         self._init_functions()
-        self.run_id = int(self._init_log()) + 1
+        self.data_id = int(self._init_log()) + 1
         # print(self.MOL.atoms)
 
         if self.step or self.truncate:
@@ -458,15 +462,66 @@ class Visualize:
             self.dict_dihedral, orient="index"
         ).transpose()
 
+        if self.to_csv:
+            np_data = self.DF_dihedrals.to_numpy(dtype=np.float64)
+            self.data_npz = f"{self.data_id}_rawdata.npz"
+
+            np.savez_compressed(
+                self.data_npz,
+                rawdata=np_data,
+            )
+
+            self.plot_type = "rawdata"
+            self.plot_name = "dihedral"
+            self.plot_labels = " "
+            self.plot_limits = " "
+            self.plot_resolution = " "
+
+            self._update_log()
+
     def _geometry2DF(self):
         self.DF_geometry = pd.DataFrame.from_dict(
             self.dict_dihedral, orient="index"
         ).transpose()
 
+        if self.to_csv:
+            np_data = self.DF_geometry.to_numpy(dtype=np.float64)
+            self.data_npz = f"{self.data_id}_rawdata.npz"
+
+            np.savez_compressed(
+                self.data_npz,
+                rawdata=np_data,
+            )
+
+            self.plot_type = "rawdata"
+            self.plot_name = "geometry"
+            self.plot_labels = " "
+            self.plot_limits = " "
+            self.plot_resolution = " "
+
+            self._update_log()
+
     def _hbond2DF(self):
         self.DF_hbond = pd.DataFrame.from_dict(
             self.dict_hbond, orient="index"
         ).transpose()
+
+        if self.to_csv:
+            np_data = self.DF_dihedrals.to_numpy(dtype=np.float64)
+            self.data_npz = f"{self.data_id}_rawdata.npz"
+
+            np.savez_compressed(
+                self.data_npz,
+                rawdata=np_data,
+            )
+
+            self.plot_type = "rawdata"
+            self.plot_name = "hbonds"
+            self.plot_labels = " "
+            self.plot_limits = " "
+            self.plot_resolution = " "
+
+            self._update_log()
 
         self.DF_hbond["Hbond presence"] = np.where(
             (self.DF_hbond["angle"] <= 30) & (
@@ -485,10 +540,45 @@ class Visualize:
             self.dict_axis, orient="index"
         ).transpose()
 
+        if self.to_csv:
+            np_data = self.DF_dihedrals.to_numpy(dtype=np.float64)
+            self.data_npz = f"{self.data_id}_rawdata.npz"
+
+            np.savez_compressed(
+                self.data_npz,
+                rawdata=np_data,
+            )
+
+            self.plot_type = "rawdata"
+            self.plot_name = "axis"
+            self.plot_labels = " "
+            self.plot_limits = " "
+            self.plot_resolution = " "
+
+            self._update_log()
+
     def _distance2DF(self):
         self.DF_distance = pd.DataFrame.from_dict(
             self.dict_distance, orient="index"
         ).transpose()
+
+        if self.to_csv:
+            np_data = self.DF_dihedrals.to_numpy(dtype=np.float64)
+            self.data_npz = f"{self.data_id}_rawdata.npz"
+
+            np.savez_compressed(
+                self.data_npz,
+                rawdata=np_data,
+            )
+
+            self.plot_type = "rawdata"
+            self.plot_name = "contact"
+            self.plot_labels = " "
+            self.plot_limits = " "
+            self.plot_resolution = " "
+
+            self._update_log()
+
         self.pivot_distance = pd.pivot_table(
             self.DF_distance,
             values="distance",
@@ -636,7 +726,7 @@ class Visualize:
 
         if self.to_csv:
 
-            self.data_npz = f"{self.run_id}_data.npz"
+            self.data_npz = f"{self.data_id}_data.npz"
 
             np.savez_compressed(
                 self.data_npz,
@@ -659,7 +749,7 @@ class Visualize:
     def _do_rama_2d(self):
         from itertools import chain, combinations
 
-        from libplot import ramachandran_plot
+        from libplot import plt_ramachandran
 
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
         DF_combinations = combinations(DF_angles, 2)
@@ -682,7 +772,7 @@ class Visualize:
 
             if self.to_csv:
 
-                self.data_npz = f"{self.run_id}_data.npz"
+                self.data_npz = f"{self.data_id}_data.npz"
 
                 np.savez_compressed(
                     self.data_npz,
@@ -692,18 +782,18 @@ class Visualize:
 
                 self.plot_type = "rama_2d"
                 self.plot_name = name
-                self.plot_labels = " ".join(labels)
+                self.plot_labels = " ".join(list(comb))
                 self.plot_limits = " ".join([str(i) for i in chain(*grid)])
                 self.plot_resolution = resolution
 
                 self._update_log()
 
             if not self.no_plot:
-                ramachandran_plot(density, coordinates,
-                                  name=name, limits=grid, labels=labels)
+                plt_ramachandran(density, coordinates,
+                                 name=name, limits=grid, labels=labels)
 
     def _do_rama_1d(self):
-        from libplot import distribution_plot
+        from libplot import plt_distribution
 
         DF_angles = self.DF_dihedrals[["Phi", "Xi", "Chi"]]
         np_angles = DF_angles.to_numpy(dtype=np.float64)
@@ -713,8 +803,21 @@ class Visualize:
         )
         resolution = 180
 
-        distribution_plot(np_angles, DF_angles.columns.tolist(),
-                          "test", grid, resolution)
+        density_list = []
+        coordinates_list = []
+        for data in np_angles.T:
+
+            data = data.reshape(-1, 1)
+            density, coordinates = calculate_kde(data, grid[0][0], resolution)
+            density_list.append(density)
+            coordinates_list.append(coordinates)
+
+        if not self.no_plot:
+            plt_distribution(density_list, coordinates_list,
+                             labels=DF_angles.columns.tolist(),
+                             name="test",
+                             limits=grid,
+                             resolution=resolution)
 
     def _do_geometry(self):
         import matplotlib.pyplot as plt
@@ -790,7 +893,7 @@ if __name__ == "__main__":
     options = None
     step = None
     no_plot = True
-    to_csv =  True
+    to_csv = True
     log_file = None
     structure = None
     cluster = None

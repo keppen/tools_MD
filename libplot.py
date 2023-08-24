@@ -214,7 +214,7 @@ def debug_geometry(normal1, normal2, point1, point2):
     plt.close()
 
 
-def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
+def plt_ramachandran(data, coordiantes, limits=None, name=None, labels=None):
     """
     Generate a Ramachandran plot using kernel density estimation (KDE).
 
@@ -262,8 +262,8 @@ def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
     plt.ylabel(labels[1])
 
     # Set the limits of the x and y axes to (-180, 180)
-    plt.xlim(-180, 180)
-    plt.ylim(-180, 180)
+    plt.xlim(xmin, xmax)
+    plt.ylim(ymin, ymax)
 
     # Customize axes properties
     plt.gca().spines['bottom'].set_linewidth(0.75)
@@ -303,15 +303,12 @@ def ramachandran_plot(data, coordiantes, limits=None, name=None, labels=None):
     plt.close()
 
 
-def distribution_plot(data, coordinates,  limits=None, name=None, labels=None):
+def plt_distribution(data_list, coordinates_list,  limits=None, name=None, labels=None):
     # import necessary libraries and modules
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
 
-    from libmath import calculate_kde
-
-    data_array = data.T
-    num_plots = data_array.shape[0]
+    num_plots = len(data_list)
 
     # Configure font and font size for the plot
     plt.rcParams['font.sans-serif'] = "Arial"
@@ -320,19 +317,18 @@ def distribution_plot(data, coordinates,  limits=None, name=None, labels=None):
     # Create a figure and subplots
     fig, axes = plt.subplots(1, num_plots, figsize=(3.45, 3.45), sharey=True)
 
-    # Set the title for the entire figure
-    # fig.suptitle(title)
+    # Extract limits from variable
     xg = limits[0]
     xmin, xmax = xg
 
-    for i, (data, label) in enumerate(zip(data_array, labels)):
+    for i, packed in enumerate(zip(data_list, coordinates_list, labels)):
+
+        # unpack variables
+        data, coords, label = *packed
         ax = axes[i]
 
-        data = data.reshape(-1, 1)
-        density, coords = calculate_kde(data, limits, 180)
-
         # Plot the data
-        ax.plot(density, coords[0])
+        ax.plot(data, coords)
 
         # Set labels and title for each subplot
         ax.set_xlabel(label)
@@ -369,3 +365,7 @@ def distribution_plot(data, coordinates,  limits=None, name=None, labels=None):
 
     # Show the plot
     plt.show()
+
+
+def plt_heatmap():
+    pass
