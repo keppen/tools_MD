@@ -367,5 +367,28 @@ def plt_distribution(data_list, coordinates_list,  limits=None, name=None, label
     plt.show()
 
 
-def plt_heatmap():
-    pass
+def plt_heatmap(data, coordiantes, limits=None, name=None, labels=None):
+    import matplotlib.pyplot as plt
+    plt
+    # sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
+    #
+    # print(self.pivot_hbond)
+    # f, ax = plt.subplots()
+    # sb.heatmap(
+    #     self.pivot_hbond,
+    #     cmap="crest",
+    #     vmin=0,
+    #     vmax=1,
+    # )
+    # f.savefig(
+    #     f"hbond_{name}_{cluster}.png",
+    #     dpi=100,
+    # )
+
+    # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
+    # plt.close()
+
+
+def plt_lineplot(data, coordiantes, limits=None, name=None, labels=None):
+    import matplotlib.pyplot as plt
+    plt
