@@ -1,3 +1,31 @@
+greek_letters = {
+        "phi": "\u03c6",
+        "psi": "\u03c8",
+        "xi": "\u03be",
+        "chi": "\u03c7",
+        "alpha": "\u03b1",
+        "theta": "\u03b8",
+        }
+other_characters = {
+        "_1": "\u2081",
+        "_2": "\u2082",
+        }
+
+
+def latin_2_greek(symbols):
+    import re
+    new_list = []
+    for symbol in symbols:
+        symbol = symbol.lower()
+        if bool(re.search(r"\d", symbol)):
+            symbol1 = symbol[:-1]
+            subscript = f"_{symbol[-1]}"
+            new_list.append(f"{greek_letters[symbol1]}{other_characters[subscript]}")
+        else:
+            new_list.append(greek_letters[symbol])
+    return new_list
+
+
 def split_name(file):
     """Split name of file and get the information about analyzed file.
 

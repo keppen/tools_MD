@@ -1,5 +1,10 @@
 def mavi_contour(data, coordinates, limits=None, name="test", labels=None):
     from mayavi import mlab
+    # import matplotlib.pyplot as plt
+
+    # Configure Matplotlib font settings
+    # plt.rcParams['font.sans-serif'] = 'Arial'
+    # plt.rcParams['font.size'] = 10
 
     # mlab.options.offscreen = True
     # fig = mlab.figure(figure=None)
@@ -7,6 +12,7 @@ def mavi_contour(data, coordinates, limits=None, name="test", labels=None):
 
     xg, yg, zg = limits
     xi, yi, zi = coordinates
+
     # Create a white scene background
     fig = mlab.figure(fgcolor=(0, 0, 0), bgcolor=(1, 1, 1), size=(963, 963))
 
@@ -69,28 +75,45 @@ def mavi_contour(data, coordinates, limits=None, name="test", labels=None):
         nb_labels=5,        # Number of labels on each axis
     )
 
+    # Customize the font properties of the scale (ticks and labels)
+    # for tick in ax.xaxis.get_major_ticks():
+    #     tick.label1.set_fontname('arial')  # Change the font name
+    #     tick.label1.set_fontsize(10)       # Change the font size
+    #
+    # for tick in ax.yaxis.get_major_ticks():
+    #     tick.label1.set_fontname('arial')  # Change the font name
+    #     tick.label1.set_fontsize(10)       # Change the font size
+    #
+    # for tick in ax.zaxis.get_major_ticks():
+    #     tick.label1.set_fontname('arial')  # Change the font name
+    #     tick.label1.set_fontsize(10)       # Change the font size
+
     ax.axes.font_factor = 1
     ax.axes.label_format = '    %4.0f'
-    ax.axes.x_label = "Phi"
-    ax.axes.y_label = "Xi"
-    ax.axes.z_label = "Chi"
+    ax.axes.x_label = labels[0]
+    ax.axes.y_label = labels[1]
+    ax.axes.z_label = labels[2]
 
     ax.label_text_property.bold = False
     ax.label_text_property.italic = False
     ax.label_text_property.color = (0, 0, 0)
     ax.label_text_property.font_size = 8
+    ax.label_text_property.font_family = 'arial'
 
     ax.title_text_property.bold = False
     ax.title_text_property.italic = False
     ax.title_text_property.font_size = 8
+    ax.title_text_property.font_family = 'arial'
     ax.property.color = (0, 0, 0)
-
-    # mlab.axes()
 
     # Adjust the layout settings for a tight layout
     fig.scene.disable_render = True  # Disable rendering during layout adjustments
-    mlab.view(30, 30, distance=1300)       # Adjust camera distance
+
+    mlab.view(30, 30,                # Adjust camera distance
+              distance=(xmax - xmin)*3.6
+              )
     mlab.roll(0)                     # Reset camera roll
+
     fig.scene.disable_render = False  # Re-enable renderingv
 
     # mlab.savefig("test.png",
@@ -214,7 +237,7 @@ def debug_geometry(normal1, normal2, point1, point2):
     plt.close()
 
 
-def plt_ramachandran(data, coordiantes, limits=None, name=None, labels=None):
+def plt_ramachandran(data, coordinates, limits=None, name=None, labels=None):
     """
     Generate a Ramachandran plot using kernel density estimation (KDE).
 
@@ -234,6 +257,8 @@ def plt_ramachandran(data, coordiantes, limits=None, name=None, labels=None):
     # import necessary libraries and modules
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
+    import matplotlib.font_manager as font_manager
+    from utils import latin_2_greek
 
     # Define the grid for the contour plot
 
@@ -242,7 +267,9 @@ def plt_ramachandran(data, coordiantes, limits=None, name=None, labels=None):
     ymin, ymax = yg
 
     # Configure font and font size for the plot
-    plt.rcParams['font.sans-serif'] = "Arial"
+    font_path = "/home/mszatko/.local/share/fonts/ARIALUNI.TTF"
+    custom_font = font_manager.FontProperties(fname=font_path)
+    plt.rcParams['font.family'] = custom_font.get_name()
     plt.rcParams['font.size'] = 8
 
     # Create a new figure
@@ -250,14 +277,16 @@ def plt_ramachandran(data, coordiantes, limits=None, name=None, labels=None):
 
     # Create a filled contour plot
     plt.contourf(
-        coordiantes[0],
-        coordiantes[1],
+        coordinates[0],
+        coordinates[1],
         data,
         cmap='Greys',
         levels=100,
+        vmin=0,
     )
 
     # Customize labels and title
+    labels = latin_2_greek(labels)
     plt.xlabel(labels[0])
     plt.ylabel(labels[1])
 
@@ -266,29 +295,30 @@ def plt_ramachandran(data, coordiantes, limits=None, name=None, labels=None):
     plt.ylim(ymin, ymax)
 
     # Customize axes properties
-    plt.gca().spines['bottom'].set_linewidth(0.75)
-    plt.gca().spines['left'].set_linewidth(0.75)
-    plt.gca().spines['top'].set_linewidth(0.75)
-    plt.gca().spines['right'].set_linewidth(0.75)
+    plt.gca().spines['bottom'].set_linewidth(0.5)
+    plt.gca().spines['left'].set_linewidth(0.5)
+    plt.gca().spines['top'].set_linewidth(0.5)
+    plt.gca().spines['right'].set_linewidth(0.5)
 
     # Customize tick parameters for major ticks
+    num_ticks = (xmax - xmin) / 6
     major_locator = ticker.MultipleLocator(
-        base=60)  # Set major tick every 30 degrees
+        base=num_ticks)  # Set major tick every 30 degrees
     plt.gca().xaxis.set_major_locator(major_locator)
     plt.gca().yaxis.set_major_locator(major_locator)
-    plt.gca().xaxis.set_tick_params(width=0.75, length=3,
+    plt.gca().xaxis.set_tick_params(width=0.5, length=3,
                                     direction='out', which='both', top=True)
-    plt.gca().yaxis.set_tick_params(width=0.75, length=3,
+    plt.gca().yaxis.set_tick_params(width=0.5, length=3,
                                     direction='out', which='both', right=True)
 
     # Customize tick parameters for minor ticks
     minor_locator = ticker.MultipleLocator(
-        base=60/4)  # Set minor tick every 10 degrees
+        base=num_ticks/4)  # Set minor tick every 10 degrees
     plt.gca().xaxis.set_minor_locator(minor_locator)
     plt.gca().yaxis.set_minor_locator(minor_locator)
-    plt.gca().xaxis.set_tick_params(width=0.5, length=1.5,
+    plt.gca().xaxis.set_tick_params(width=0.3, length=1.5,
                                     direction='out', which='minor', top=True)
-    plt.gca().yaxis.set_tick_params(width=0.5, length=1.5,
+    plt.gca().yaxis.set_tick_params(width=0.3, length=1.5,
                                     direction='out', which='minor', right=True)
 
     # Ensure a tight layout
@@ -307,11 +337,15 @@ def plt_distribution(data_list, coordinates_list,  limits=None, name=None, label
     # import necessary libraries and modules
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
+    import matplotlib.font_manager as font_manager
+    from utils import latin_2_greek
 
     num_plots = len(data_list)
 
     # Configure font and font size for the plot
-    plt.rcParams['font.sans-serif'] = "Arial"
+    font_path = "/home/mszatko/.local/share/fonts/ARIALUNI.TTF"
+    custom_font = font_manager.FontProperties(fname=font_path)
+    plt.rcParams['font.family'] = custom_font.get_name()
     plt.rcParams['font.size'] = 8
 
     # Create a figure and subplots
@@ -321,14 +355,17 @@ def plt_distribution(data_list, coordinates_list,  limits=None, name=None, label
     xg = limits[0]
     xmin, xmax = xg
 
+    # Change lables to greek
+    labels = latin_2_greek(labels)
+
     for i, packed in enumerate(zip(data_list, coordinates_list, labels)):
 
         # unpack variables
-        data, coords, label = *packed
+        data, coords, label = packed
         ax = axes[i]
 
         # Plot the data
-        ax.plot(data, coords)
+        ax.plot(data, coords[0], color="b", linewidth=0.75)
 
         # Set labels and title for each subplot
         ax.set_xlabel(label)
@@ -336,59 +373,138 @@ def plt_distribution(data_list, coordinates_list,  limits=None, name=None, label
             ax.set_ylabel("Angle distibution")
 
         # Set the limits of the x and y axes to (-180, 180)
-        plt.ylim(-180, 180)
+        plt.ylim(xmin, xmax)
 
         # Customize axes properties
-        plt.gca().spines['bottom'].set_linewidth(0.75)
-        plt.gca().spines['left'].set_linewidth(0.75)
-        plt.gca().spines['top'].set_linewidth(0.75)
-        plt.gca().spines['right'].set_linewidth(0.75)
+        ax.spines['bottom'].set_linewidth(0.5)
+        ax.spines['left'].set_linewidth(0.5)
+        ax.spines['top'].set_linewidth(0.5)
+        ax.spines['right'].set_linewidth(0.5)
 
         # Customize tick parameters for major ticks
         ax.set_xticks([])
 
+        num_ticks = (xmax - xmin) / 6
         major_locator = ticker.MultipleLocator(
-            base=60)  # Set major tick every 30 degrees
-        plt.gca().yaxis.set_major_locator(major_locator)
-        plt.gca().yaxis.set_tick_params(width=0.75, length=3,
+            base=num_ticks)  # Set major tick every 30 degrees
+        ax.yaxis.set_major_locator(major_locator)
+        ax.yaxis.set_tick_params(width=0.5, length=3,
                                         direction='out', which='both', right=False)
 
         # Customize tick parameters for minor ticks
         minor_locator = ticker.MultipleLocator(
-            base=60/4)  # Set minor tick every 10 degrees
-        plt.gca().yaxis.set_minor_locator(minor_locator)
-        plt.gca().yaxis.set_tick_params(width=0.5, length=1.5,
+            base=num_ticks/4)  # Set minor tick every 10 degrees
+        ax.yaxis.set_minor_locator(minor_locator)
+        ax.yaxis.set_tick_params(width=0.3, length=1.5,
                                         direction='out', which='minor', right=False)
 
     # Adjust layout to avoid overlapping labels
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     # Show the plot
-    plt.show()
+    # plt.show()
+
+    # Save the plot as an image
+    plt.savefig(
+        name + ".png",
+        dpi=1200
+    )
+    # Close the plot
+    plt.close()
 
 
-def plt_heatmap(data, coordiantes, limits=None, name=None, labels=None):
+def plt_heatmap(data, limits=None, name=None, labels=None, **kargs):
+    # import necessary libraries and modules
     import matplotlib.pyplot as plt
-    plt
-    # sb.set_context("paper", font_scale=1.35, rc={"lines.linewidth": 0.85})
-    #
-    # print(self.pivot_hbond)
-    # f, ax = plt.subplots()
-    # sb.heatmap(
-    #     self.pivot_hbond,
-    #     cmap="crest",
-    #     vmin=0,
-    #     vmax=1,
-    # )
-    # f.savefig(
-    #     f"hbond_{name}_{cluster}.png",
-    #     dpi=100,
-    # )
+    import numpy as np
 
-    # plot.savefig(f"{'test1.png' if i == 0 else 'test2'}", dpi=1000)
-    # plt.close()
+    # Extract X and Y coordinates
+    # x_coords, y_coords = coordinates
+
+    # Configure font and font size for the plot
+    plt.rcParams['font.sans-serif'] = "Arial"
+    plt.rcParams['font.size'] = 8
+
+    palette = None
+    if "palette" in kargs:
+        palette = kargs["palette"]
+
+    # Create a new figure
+    fig, ax = plt.subplots(figsize=(3.45, 3.45))
+
+    # Create a heatmap
+    ax.imshow(
+        data,
+        cmap=palette or 'viridis',
+        origin='lower',
+        # extent=[x_coords.min(), x_coords.max(), y_coords.min(), y_coords.max()],
+        aspect='auto'
+    )
+
+    # Show all ticks and label them with the respective list entries
+    ax.set_xticks(np.arange(len(labels[0])), labels=labels[0])
+    ax.set_yticks(np.arange(len(labels[1])), labels=labels[1])
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    if "ax_labels" in kargs:
+        ax.set_xlabel(kargs["ax_labels"][0])
+        ax.set_ylabel(kargs["ax_labels"][1])
+
+    # Turn spines off and create white grid.
+    ax.spines[:].set_visible(False)
+
+    ax.set_xticks(np.arange(data.to_numpy().shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(data.to_numpy().shape[0]+1)-.5, minor=True)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    # Set the limits of the x and y axes
+    # plt.xlim(*limits[0])
+    # plt.ylim(*limits[1])
+
+    # Ensure a tight layout
+    plt.tight_layout()
+
+    # Save the plot as an image
+    plt.savefig(
+        name + ".png",
+        dpi=1200
+    )
+    # Close the plot
+    plt.close()
 
 
-def plt_lineplot(data, coordiantes, limits=None, name=None, labels=None):
+def plt_lineplot(data, limits=None, name=None, labels=None):
+    # import necessary libraries and modules
     import matplotlib.pyplot as plt
-    plt
+
+    # Extract X and Y coordinates
+    # x_coords, y_coords = coordinates
+
+    # Configure font and font size for the plot
+    plt.rcParams['font.sans-serif'] = "Arial"
+    plt.rcParams['font.size'] = 8
+
+    # Create a new figure
+    plt.figure(figsize=(3.45, 3.45))
+
+    # Create a line plot
+    plt.plot(data.index, data.distance)
+
+    # Customize labels and title
+    plt.xlabel(labels[0])
+    plt.ylabel(labels[1])
+
+    # Ensure a tight layout
+    plt.tight_layout()
+
+    # Save the plot as an image
+    plt.savefig(
+        name + ".png",
+        dpi=1200
+    )
+    # Close the plot
+    plt.close()

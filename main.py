@@ -29,8 +29,8 @@ Parameters:
     """
 
     option_actions = {
-        "-h": lambda: print(main.__doc__) or exit(0),
-        "--help": lambda: print(main.__doc__) or exit(0),
+        "-h": lambda: print(main.__doc__),
+        "--help": lambda: print(main.__doc__),
         "readlog": lambda: read_log(arguments),
         "run": lambda: run(arguments),
         "rerun": lambda: rerun(arguments)
@@ -56,7 +56,7 @@ Parameters:
     -pt, --plot-type    | Filter by type of the plot.
     -id, --data-id      | Filter by data ID.
     -h, --help          | Display this help message and exit.
-
+s
     Filters does not work now!
     """
 
@@ -128,8 +128,8 @@ Parameters:
     truncate = None
     step = None
     options = None
-    no_plot = None
-    to_csv = None
+    no_plot = False
+    to_csv = True
     log_file = None
 
     for index, opt in enumerate(arguments):
@@ -180,6 +180,9 @@ Parameters:
     -h, --help         | Display this help message and exit.
     """
 
+    plot_dim = None
+    plot_name = None
+
     for index, opt in enumerate(arguments):
         if opt in ["-l", "--log-file"]:
             log_file = arguments[index + 1]
@@ -199,7 +202,7 @@ Parameters:
 
     for entry in logs_lines:
         fileds = entry.split(';')
-        if int(data_id) == str(fileds[0]):
+        if str(data_id) == str(fileds[0]):
             run_opts = fileds
             break
 
@@ -215,24 +218,36 @@ def from_processed_data(args, **kargs):
     from libplot import mavi_contour, plt_ramachandran, plt_distribution
 
     plotting_functions = {
-        '1': lambda: plt_distribution,
-        '2': lambda: plt_ramachandran,
-        '3': lambda: mavi_contour,
+        '1': lambda density, coords, limits, name, labels: plt_distribution(
+            density, coords, limits=limits, name=name, labels=plot_labels
+            ),
+        '2': lambda density, coords, limits, name, labels: plt_ramachandran(
+            density, coords, limits=limits, name=name, labels=plot_labels
+            ),
+        '3': lambda density, coords, limits, name, labels: mavi_contour(
+            density, coords, limits=limits, name=name, labels=plot_labels
+            ),
     }
 
     plot_type = args[5]
-    plot_dim = kargs["plots_dim"] or plot_type[-1]
+    plot_dim = kargs["plot_dim"] or plot_type[-2]
+    plot_dim = int(plot_dim)
 
-    plot_name = kargs['plot_name'] or args[6]
+    plot_name = args[6]
     plot_labels = args[7].split()
+    # print(plot_labels)
 
-    plot_limits = np.array(args[8].split())
-    plot_limits = plot_limits.reshape(2, plot_dim)
+    plot_limits = args[8].split()
+    plot_limits = np.array([int(x) for x in plot_limits])
+    plot_limits = plot_limits.reshape(plot_dim, 2)
+    # print(plot_limits)
 
-    density, coords = np.load(args[-1])
+    loaded_data = np.load(args[-1].strip())
+    density = loaded_data["data"]
+    coords = loaded_data["coords"]
 
     for plot in plotting_functions:
-        if plot == plot_dim:
+        if int(plot) == plot_dim:
             plotting_functions[plot](
                 density,
                 coords,
@@ -240,10 +255,11 @@ def from_processed_data(args, **kargs):
                 name=plot_name,
                 labels=plot_labels,
             )
+            exit(0)
 
 
 def from_raw_data(args, **kargs):
-    data_axes = {
+    plot_axes_titles = {
         "dihedral": ["model", "residue index", "Phi", "Psi", "Xi", "Chi"],
         "geometry": ["model", "residue index", "Alpha", "Theta1", "Theta2"],
         "hbonds": ["model", "residue acceptor", "residue donor", "angle", "lenght"],
@@ -252,46 +268,50 @@ def from_raw_data(args, **kargs):
     }
 
     plotting_functions = {
-        'd1': lambda: R._do_rama_1d,
-        'd2': lambda: R._do_rama_2d,
-        'd3': lambda: R._do_rama_3d,
-        'g1': lambda: R._do_geom_1d,
-        'g2': lambda: R._do_geom_2d,
-        'g3': lambda: R._do_geom_3d,
-        'h': lambda: R._do_hbond,
-        'c': lambda: R._do_contact,
-        'a': lambda: R._do_axis
+        'd1': lambda data: R._do_rama_1d(data=data),
+        'd2': lambda data: R._do_rama_2d(data=data),
+        'd3': lambda data: R._do_rama_3d(data=data),
+        'g1': lambda data: R._do_geom_1d(data=data),
+        'g2': lambda data: R._do_geom_2d(data=data),
+        'g3': lambda data: R._do_geom_3d(data=data),
+        'h': lambda data: R._do_hbond(data=data),
+        'c': lambda data: R._do_contact(data=data),
+        'a': lambda data: R._do_axis(data=data),
     }
     structure = args[1]
     cluster = args[2]
 
-    data_type = args[5]
-    plot_name = kargs['plot_name'] or args[6]
-    plot_dim = kargs["plots_dim"]
+    # plot_type = args[5]
+    plot_name = args[6]
+    plot_dim = kargs["plot_dim"]
 
-    DF_data = read_npz(args[-1], data_axes[data_type])[0]
+    DF_data = read_npz(args[-1].strip(), plot_axes_titles[plot_name])
 
-    options = f"{data_type[0]}{plot_dim or None}"
+    options = f"{plot_name[0]}{plot_dim or ''}"
+    print(options)
 
     R = Visualize(
         structure,
         cluster,
         log_file=kargs["log_file"],
-        no_plot=False
+        no_plot=False,
+        truncate=args[3],
+        step=args[4]
     )
     R._init_log()
 
     for plot in plotting_functions:
+        print(plot)
         if options == plot:
-            plotting_functions["opt"](DF_data, name=plot_name)
-
-    exit(0)
+            plotting_functions[plot](DF_data)
+            exit(0)
 
 
 def read_npz(data_npz, columns=None):
 
     data_raw = np.load(data_npz)
-    return [pd.DataFrame(array, columns=columns) for array in data_raw]
+    data_raw = data_raw['rawdata']
+    return pd.DataFrame(data_raw, columns=columns)
 
 
 def print_log(log_file, **kargs):
@@ -309,7 +329,7 @@ def print_log(log_file, **kargs):
             "Plot res",
             "Data npz"
         ]
-        widths = [8, 16, 25, 9, 9, 12, 18, 18, 25, 19, 18]
+        widths = [8, 16, 25, 9, 9, 12, 30, 25, 30, 19, 18]
 
         msg = [f"{t:<{s}}" for t, s in zip(titles, widths)]
         print("".join(msg))

@@ -21,6 +21,7 @@ from libmath import (
 from libread import read_pdb
 from libwrite import write_log
 from utils import split_name
+from liblogg import timing
 
 
 class Visualize:
@@ -67,7 +68,7 @@ Parameters:
         options="all",
         truncate=None,
         step=None,
-        no_plot=True,
+        no_plot=False,
         to_csv=True,
     ):
         """
@@ -90,7 +91,7 @@ Parameters:
         self.DF_geometry: pd.DataFrame
         self.DF_hbond: pd.DataFrame
         self.DF_axis: pd.DataFrame
-        self.DF_distance: pd.DataFrame
+        self.DF_contact: pd.DataFrame
 
     def _init_functions(self):
         self.runs_function = [
@@ -98,7 +99,7 @@ Parameters:
             self._get_geometry,
             self._get_hbond,
             self._get_axis,
-            self._get_distance,
+            self._get_contact,
         ]
         self.calculation_function = [
             self._do_ramachandran,
@@ -112,7 +113,7 @@ Parameters:
             self._geometry2DF,
             self._hbond2DF,
             self._axis2DF,
-            self._distance2DF,
+            self._contact2DF,
         ]
         self.rama_function = [
             self._do_rama_1d,
@@ -193,7 +194,7 @@ Parameters:
         self.index_distance_2 = []
         self.distance_distance = []
 
-        self.dict_distance = {
+        self.dict_contact = {
             "models": self.models_distance,
             "index 1": self.index_distance_1,
             "index 2": self.index_distance_2,
@@ -213,7 +214,7 @@ Parameters:
             file.close()
             no_entry = content[-1].split(';')[0]
 
-        self.data_id = no_entry + 1
+        self.data_id = int(no_entry) + 1
 
     def _update_log(self):
         run_options = [
@@ -244,6 +245,7 @@ Parameters:
 
         self._init_dicts()
         self._init_functions()
+        self._init_log()
         # print(self.MOL.atoms)
 
         if self.step or self.truncate:
@@ -402,10 +404,10 @@ Parameters:
     def _get_hbond(self):
         max_resid = self.DF_pdb.max()["residue_seqnumber"]
 
-        for acceptor in range(2, max_resid + 1):
-            for donor in range(1, max_resid):
+        for donor in range(2, max_resid + 1):
+            for acceptor in range(1, max_resid):
                 angle, lenght = self._calculate_hbond(
-                    self.DF_pdb, acceptor, donor)
+                    self.DF_pdb, donor, acceptor)
                 angle = math.acos(angle) / math.pi * 180
                 self.models_hbond.append(self.model)
                 self.resid_acceptor.append(acceptor)
@@ -420,10 +422,13 @@ Parameters:
             point = self._search_by_index(self.DF_pdb, int(index))
             self.distance_axis.append(
                 calcDistance_form_Vector(point, self.axis))
-            self.index.append(self.MOL.backbone.index(index))
+
+            self.index.append(index)
+
+            # self.index.append(self.MOL.backbone.index(index))
             self.resids_axis.append(self.MOL._findbyID(index)["resid"])
 
-    def _get_distance(self):
+    def _get_contact(self):
         atoms_indexes = []
         for index in self.MOL.backbone:
             atom = self.DF_pdb.loc[
@@ -433,14 +438,14 @@ Parameters:
             if atom.iloc[0, 1] in ["C", "CB"]:
                 atoms_indexes.append(atom.iloc[0, 0])
 
-        for index_1, atom_id_1 in enumerate(atoms_indexes):
-            for index_2, atom_id_2 in enumerate(atoms_indexes):
+        for atom_id_1 in atoms_indexes:
+            for atom_id_2 in atoms_indexes:
                 atom_1 = self._search_by_index(self.DF_pdb, int(atom_id_1))
                 atom_2 = self._search_by_index(self.DF_pdb, int(atom_id_2))
                 distance = np.linalg.norm(np.array(atom_1) - np.array(atom_2))
                 self.models_distance.append(self.model)
-                self.index_distance_1.append(index_1)
-                self.index_distance_2.append(index_2)
+                self.index_distance_1.append(atom_id_1)
+                self.index_distance_2.append(atom_id_2)
                 self.distance_distance.append(distance)
 
     def _dihedral2DF(self):
@@ -467,7 +472,7 @@ Parameters:
 
     def _geometry2DF(self):
         self.DF_geometry = pd.DataFrame.from_dict(
-            self.dict_dihedral, orient="index"
+            self.dict_geometry, orient="index"
         ).transpose()
 
         if self.to_csv:
@@ -493,7 +498,7 @@ Parameters:
         ).transpose()
 
         if self.to_csv:
-            np_data = self.DF_dihedrals.to_numpy(dtype=np.float64)
+            np_data = self.DF_hbond.to_numpy(dtype=np.float64)
             self.data_npz = f"{self.data_id}_rawdata.npz"
 
             np.savez_compressed(
@@ -509,25 +514,13 @@ Parameters:
 
             self._update_log()
 
-        self.DF_hbond["Hbond presence"] = np.where(
-            (self.DF_hbond["angle"] <= 30) & (
-                self.DF_hbond["lenght"] <= 3.5), 1, 0
-        )
-        self.pivot_hbond = pd.pivot_table(
-            self.DF_hbond,
-            values="Hbond presence",
-            index="residue acceptor",
-            columns="residue donor",
-            aggfunc=np.mean,
-        )
-
     def _axis2DF(self):
         self.DF_axis = pd.DataFrame.from_dict(
             self.dict_axis, orient="index"
         ).transpose()
 
         if self.to_csv:
-            np_data = self.DF_dihedrals.to_numpy(dtype=np.float64)
+            np_data = self.DF_axis.to_numpy(dtype=np.float64)
             self.data_npz = f"{self.data_id}_rawdata.npz"
 
             np.savez_compressed(
@@ -543,13 +536,13 @@ Parameters:
 
             self._update_log()
 
-    def _distance2DF(self):
-        self.DF_distance = pd.DataFrame.from_dict(
-            self.dict_distance, orient="index"
+    def _contact2DF(self):
+        self.DF_contact = pd.DataFrame.from_dict(
+            self.dict_contact, orient="index"
         ).transpose()
 
         if self.to_csv:
-            np_data = self.DF_dihedrals.to_numpy(dtype=np.float64)
+            np_data = self.DF_contact.to_numpy(dtype=np.float64)
             self.data_npz = f"{self.data_id}_rawdata.npz"
 
             np.savez_compressed(
@@ -637,27 +630,38 @@ Parameters:
         line2 = calcVector(p0, p3)
         return calcAngle(line1, line2), np.linalg.norm(line2)
 
+    @timing
     def _do_axis(self, data=None, name=None, limits=None, resolution=None):
         from libplot import plt_lineplot
 
-        if not data:
+        if data is None:
             data = self.DF_axis
 
-        name = name or " ".join(split_name(self.cluster_pdb))
+        name = name or "axis-" + "-".join(split_name(self.cluster_pdb))
 
-        points, coords = data[["index", "distance"]]
-        labels = list(data.columns.tolist())
-        limits = limits or [0, len(points) + 1]
+        data = data[["index", "distance"]]
+        data.set_index("index", inplace=True)
+        data = data.groupby(data.index).mean()
+
+        labels = ['Backbone atoms', 'Distance from axis [A]']
+        limits = limits or [0, data.index.max() + 1]
 
         if not self.no_plot:
-            plt_lineplot(points, coords, lables=labels,
+            plt_lineplot(data, labels=labels,
                          limits=limits, name=name)
 
+    @timing
     def _do_hbond(self, data=None, name=None, limits=None, resolution=None):
         from libplot import plt_heatmap
+        import numpy as np
 
-        if not data:
+        if data is None:
             data = self.DF_hbond
+
+        data["Hbond presence"] = np.where(
+            (data["angle"] <= 30) & (
+                data["lenght"] <= 3.5), 1, 0
+        )
 
         data = pd.pivot_table(
             data,
@@ -666,45 +670,68 @@ Parameters:
             columns="residue donor",
             aggfunc=np.mean
         )
+        print(data)
 
-        name = name or " ".join(split_name(self.cluster_pdb))
+        name = name or "hbond-" + "-".join(split_name(self.cluster_pdb))
 
         limits = None
-        labels = ["", ""]
+        labels = [
+                [f"Mer {int(x)}" for x in data.columns],
+                [f"Mer {int(y)}" for y in data.index]
+                ]
+        ax_labels = ["Donor", "Acceptor"]
 
         if not self.no_plot:
-            plt_heatmap(data, lables=labels,
-                        limits=limits, name=name)
+            plt_heatmap(
+                    data,
+                    labels=labels,
+                    limits=limits,
+                    name=name,
+                    ax_labels=ax_labels
+                    )
 
+    @timing
     def _do_contact(self, data=None, name=None, limits=None, resolution=None):
         from libplot import plt_heatmap
 
-        if not data:
-            data = self.DF_distance
+        if data is None:
+            data = self.DF_contact
 
         data = pd.pivot_table(
-            self.DF_distance,
+            data,
             values="distance",
             index="index 1",
             columns="index 2",
             aggfunc=np.mean,
         )
 
-        name = name or " ".join(split_name(self.cluster_pdb))
+        name = name or "contact-" + "-".join(split_name(self.cluster_pdb))
 
         limits = None
-        labels = ["", ""]
+        labels = [
+                [f"Atom {int(x)}" for x in data.columns],
+                [f"Atom {int(y)}" for y in data.index]
+                ]
+
+        palette = "Greens"
+
+        # ax_labels = ["Donor", "Acceptor"]
 
         if not self.no_plot:
-            plt_heatmap(data, lables=labels,
-                        limits=limits, name=name)
+            plt_heatmap(
+                    data,
+                    labels=labels,
+                    limits=limits,
+                    name=name,
+                    palette=palette
+                        )
 
+    @timing
     def _do_rama_3d(self, data=None, name=None, limits=None, resolution=180):
-        from intertools import chain
-
+        from itertools import chain
         from libplot import mavi_contour
 
-        if not data:
+        if data is None:
             data = self.DF_dihedrals
 
         DF_angles = data[["Phi", "Xi", "Chi"]]
@@ -716,7 +743,7 @@ Parameters:
                 [-180, 180],
                 [-180, 180]
             ])
-        name = name or " ".join(split_name(self.cluster_pdb))
+        name = name or "rama3d-" + "-".join(split_name(self.cluster_pdb))
         labels = DF_angles.columns.tolist()
 
         density, coordinates = calculate_kde(np_angles, limits, resolution)
@@ -743,12 +770,12 @@ Parameters:
             mavi_contour(density, coordinates, limits=limits,
                          name=name, labels=labels)
 
+    @timing
     def _do_rama_2d(self, data=None, name=None, limits=None, resolution=180):
         from itertools import chain, combinations
-
         from libplot import plt_ramachandran
 
-        if not data:
+        if data is None:
             data = self.DF_dihedrals
 
         DF_angles = data[["Phi", "Xi", "Chi"]]
@@ -765,11 +792,11 @@ Parameters:
             np_angles = DF_data.to_numpy(dtype=np.float64)
 
             if name:
-                name = f"{name}-{''.join(comb)}"
+                name_sub = f"{name}-{''.join(comb)}"
             else:
-                name = f"{' '.join(split_name(self.cluster_pdb))}-{''.join(comb)}"
+                name_sub = f"rama2d-{'-'.join(split_name(self.cluster_pdb))}-{''.join(comb)}"
 
-            labels = DF_angles.columns.tolist()
+            labels = DF_data.columns.tolist()
 
             density, coordinates = calculate_kde(np_angles, limits, resolution)
 
@@ -784,7 +811,7 @@ Parameters:
                 )
 
                 self.plot_type = "rama_2d"
-                self.plot_name = name
+                self.plot_name = name_sub
                 self.plot_labels = " ".join(list(comb))
                 self.plot_limits = " ".join([str(i) for i in chain(*limits)])
                 self.plot_resolution = resolution
@@ -793,46 +820,84 @@ Parameters:
 
             if not self.no_plot:
                 plt_ramachandran(density, coordinates,
-                                 name=name, limits=limits, labels=labels)
+                                 name=name_sub, limits=limits, labels=labels)
 
+    def _split_DF(self, data, column_name):
+        values = data.column_name.unique()
+        splited_data = []
+        values_list = []
+        for value in values:
+            condition = (data[column_name] == values)
+            filtered_data = data[condition]
+            splited_data.append(filtered_data)
+            values_list.append(value)
+        return values_list, splited_data
+
+    def _multiple_kde(self, data, limits, resolution):
+        density_list = []
+        coordinates_list = []
+        for h_array in data.T:
+
+            v_array = h_array.reshape(-1, 1)
+            density, coordinates = calculate_kde(
+                v_array, limits, resolution)
+            density_list.append(density)
+            coordinates_list.append(coordinates)
+
+    @timing
     def _do_rama_1d(self, data=None, name=None, limits=None, resolution=180):
         from libplot import plt_distribution
+        from itertools import chain
 
-        if not data:
+        if data is None:
             data = self.DF_dihedrals
 
-        DF_angles = data[["Phi", "Xi", "Chi"]]
+        print(data)
+
+        DF_angles = data[["residue index", "Phi", "Xi", "Chi"]]
         np_angles = DF_angles.to_numpy(dtype=np.float64)
 
         if not limits:
             limits = np.array(
                 [[-180, 180]]
             )
-        name = name or split_name(" ".join(self.cluster_pdb))
+        name = name or "rama1d-" + "-".join(split_name(self.cluster_pdb))
 
-        density_list = []
-        coordinates_list = []
-        for h_array in np_angles.T:
+        labels = DF_angles.columns.tolist()
 
-            v_array = h_array.reshape(-1, 1)
-            density, coordinates = calculate_kde(
-                v_array, limits[0][0], resolution)
-            density_list.append(density)
-            coordinates_list.append(coordinates)
+
+
+        if self.to_csv:
+
+            self.data_npz = f"{self.data_id}_data.npz"
+
+            np.savez_compressed(
+                self.data_npz,
+                data=np.array(density_list),
+                coords=np.array(coordinates_list)
+            )
+
+            self.plot_type = "rama_1d"
+            self.plot_name = name
+            self.plot_labels = " ".join(list(labels))
+            self.plot_limits = " ".join([str(i) for i in chain(*limits)])
+            self.plot_resolution = resolution
+
+            self._update_log()
 
         if not self.no_plot:
             plt_distribution(density_list, coordinates_list,
-                             labels=DF_angles.columns.tolist(),
+                             labels=labels,
                              name=name,
                              limits=limits,
-                             resolution=resolution)
+                             )
 
+    @timing
     def _do_geom_3d(self, data=None, name=None, limits=None, resolution=90):
-        from intertools import chain
-
+        from itertools import chain
         from libplot import mavi_contour
 
-        if not data:
+        if data is None:
             data = self.DF_geometry
 
         DF_angles = data[["Alpha", "Theta1", "Theta2"]]
@@ -841,10 +906,10 @@ Parameters:
         if not limits:
             limits = np.array([
                 [0, 180],
-                [0, 180],
-                [0, 180]
+                [0, 90],
+                [0, 90]
             ])
-        name = name or " ".join(split_name(self.cluster_pdb))
+        name = name or "geom3d-" + "-".join(split_name(self.cluster_pdb))
         labels = DF_angles.columns.tolist()
 
         density, coordinates = calculate_kde(np_angles, limits, resolution)
@@ -871,12 +936,12 @@ Parameters:
             mavi_contour(density, coordinates, limits=limits,
                          name=name, labels=labels)
 
+    @timing
     def _do_geom_2d(self, data=None, name=None, limits=None, resolution=90):
         from itertools import chain, combinations
-
         from libplot import plt_ramachandran
 
-        if not data:
+        if data is None:
             data = self.DF_geometry
 
         DF_angles = data[["Alpha", "Theta1", "Theta2"]]
@@ -893,11 +958,11 @@ Parameters:
             np_angles = DF_data.to_numpy(dtype=np.float64)
 
             if name:
-                name = f"{name}-{''.join(comb)}"
+                name_sub = f"{name}-{''.join(comb)}"
             else:
-                name = f"{' '.join(split_name(self.cluster_pdb))}-{''.join(comb)}"
+                name_sub = f"geom-2-{'-'.join(split_name(self.cluster_pdb))}-{''.join(comb)}"
 
-            labels = DF_angles.columns.tolist()
+            labels = DF_data.columns.tolist()
 
             density, coordinates = calculate_kde(np_angles, limits, resolution)
 
@@ -912,7 +977,7 @@ Parameters:
                 )
 
                 self.plot_type = "geom_2d"
-                self.plot_name = name
+                self.plot_name = name_sub
                 self.plot_labels = " ".join(list(comb))
                 self.plot_limits = " ".join([str(i) for i in chain(*limits)])
                 self.plot_resolution = resolution
@@ -921,15 +986,18 @@ Parameters:
 
             if not self.no_plot:
                 plt_ramachandran(density, coordinates,
-                                 name=name, limits=limits, labels=labels)
+                                 name=name_sub, limits=limits, labels=labels)
 
+    @timing
     def _do_geom_1d(self, data=None, name=None, limits=None, resolution=90):
         from libplot import plt_distribution
+        from itertools import chain
 
-        if not data:
+        print(data)
+        if data is None:
             data = self.DF_geometry
 
-        DF_angles = self.DF_dihedrals[["Alpha", "Theta1", "Theta2"]]
+        DF_angles = data[["Alpha", "Theta1", "Theta2"]]
         np_angles = DF_angles.to_numpy(dtype=np.float64)
 
         if not limits:
@@ -937,22 +1005,44 @@ Parameters:
                 [[0, 180]]
             )
 
+        name = name or "geom1d-" + "-".join(split_name(self.cluster_pdb))
+
+        labels = DF_angles.columns.tolist()
+
         density_list = []
         coordinates_list = []
         for h_array in np_angles.T:
 
             v_array = h_array.reshape(-1, 1)
             density, coordinates = calculate_kde(
-                v_array, limits[0][0], resolution)
+                v_array, limits, resolution)
             density_list.append(density)
             coordinates_list.append(coordinates)
 
+        if self.to_csv:
+
+            self.data_npz = f"{self.data_id}_data.npz"
+
+            np.savez_compressed(
+                self.data_npz,
+                data=np.array(density_list),
+                coords=np.array(coordinates_list)
+            )
+
+            self.plot_type = "geom_1d"
+            self.plot_name = name
+            self.plot_labels = " ".join(list(labels))
+            self.plot_limits = " ".join([str(i) for i in chain(*limits)])
+            self.plot_resolution = resolution
+
+            self._update_log()
+
         if not self.no_plot:
             plt_distribution(density_list, coordinates_list,
-                             labels=DF_angles.columns.tolist(),
+                             labels=labels,
                              name=name,
                              limits=limits,
-                             resolution=resolution)
+                             )
 
 
 if __name__ == "__main__":

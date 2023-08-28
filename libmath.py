@@ -133,7 +133,7 @@ def estiamte_bandwidth(data):
     grid = GridSearchCV(
         KernelDensity(kernel="gaussian"),
         {"bandwidth": bandwidth},
-        cv=RepeatedKFold(n_splits=6, n_repeats=3),
+        cv=RepeatedKFold(n_splits=4, n_repeats=2),
         n_jobs=-2
     )
     grid.fit(data)
@@ -160,6 +160,7 @@ def calculate_kde(data, grid, resolution):
     """
     # Create a Gaussian KDE object
     bandwidth = estiamte_bandwidth(data)
+
     kde = KernelDensity(bandwidth=bandwidth, kernel='gaussian')
 
     # Fit the KDE model to the data
