@@ -823,26 +823,46 @@ Parameters:
                                  name=name_sub, limits=limits, labels=labels)
 
     def _split_DF(self, data, column_name):
-        values = data.column_name.unique()
-        splited_data = []
-        values_list = []
-        for value in values:
-            condition = (data[column_name] == values)
-            filtered_data = data[condition]
-            splited_data.append(filtered_data)
-            values_list.append(value)
-        return values_list, splited_data
+        """
+    Split DataFrame into DF with respcect to angle_names and res_ids.
+    Return a dictionary where each entry contains a produced Dataframes
+    converted into numpy arrays.
+        """
+
+        # lists of items to split by
+        res_ids = data[column_name].unique()
+        angle_names = data.columns.tolist()[1:]
+
+        data_dict = {}
+        # filter by res id
+        for res_id in res_ids:
+            condition = (data[column_name] == res_id)
+            by_res_id = data[condition].copy()
+            by_res_id.drop(by_res_id.columns[0], axis=1, inplace=True)
+            # filter by angle name
+            for angle_name in angle_names:
+                by_angle = by_res_id[angle_name]
+                vector = by_angle.to_numpy(dtype=np.float64).reshape(-1, 1)
+                key = (angle_name, int(res_id))
+                data_dict[key] = vector
+
+        return data_dict
 
     def _multiple_kde(self, data, limits, resolution):
-        density_list = []
-        coordinates_list = []
-        for h_array in data.T:
+        """
+    Calculate a kde from data produced by _split_DF.
+    Return a two dictionaries containing densites and coordinates.
+        """
 
-            v_array = h_array.reshape(-1, 1)
-            density, coordinates = calculate_kde(
-                v_array, limits, resolution)
-            density_list.append(density)
-            coordinates_list.append(coordinates)
+        density_dict = {}
+        coordinate_dict = {}
+        for key, item in data.items():
+            angle, res_id = key
+            density, coordinates = calculate_kde(item, limits, resolution)
+            density_dict[f"{angle} {res_id} dens"] = np.array(density)
+            coordinate_dict[f"{angle} {res_id} coords"] = np.array(coordinates)
+
+        return density_dict, coordinate_dict
 
     @timing
     def _do_rama_1d(self, data=None, name=None, limits=None, resolution=180):
@@ -852,20 +872,21 @@ Parameters:
         if data is None:
             data = self.DF_dihedrals
 
-        print(data)
+        if not limits:
+            limits = np.array([
+                [-180, 180],
+                [-180, 180],
+                [-180, 180]
+            ])
 
         DF_angles = data[["residue index", "Phi", "Xi", "Chi"]]
-        np_angles = DF_angles.to_numpy(dtype=np.float64)
+        data = self._split_DF(DF_angles, "residue index")
+        density_dict, coordinates_dict = self._multiple_kde(data, limits[0].reshape(1,-1), resolution)
 
-        if not limits:
-            limits = np.array(
-                [[-180, 180]]
-            )
+
         name = name or "rama1d-" + "-".join(split_name(self.cluster_pdb))
 
-        labels = DF_angles.columns.tolist()
-
-
+        labels = DF_angles.columns.tolist()[1:]
 
         if self.to_csv:
 
@@ -873,8 +894,8 @@ Parameters:
 
             np.savez_compressed(
                 self.data_npz,
-                data=np.array(density_list),
-                coords=np.array(coordinates_list)
+                **density_dict,
+                **coordinates_dict
             )
 
             self.plot_type = "rama_1d"
@@ -886,7 +907,7 @@ Parameters:
             self._update_log()
 
         if not self.no_plot:
-            plt_distribution(density_list, coordinates_list,
+            plt_distribution(density_dict, coordinates_dict,
                              labels=labels,
                              name=name,
                              limits=limits,
@@ -993,31 +1014,23 @@ Parameters:
         from libplot import plt_distribution
         from itertools import chain
 
-        print(data)
         if data is None:
             data = self.DF_geometry
 
-        DF_angles = data[["Alpha", "Theta1", "Theta2"]]
-        np_angles = DF_angles.to_numpy(dtype=np.float64)
-
         if not limits:
             limits = np.array(
-                [[0, 180]]
+                    [[0, 180],
+                     [0, 90],
+                     [0, 90]]
             )
+
+        DF_angles = data[["residue index", "Alpha", "Theta1", "Theta2"]]
+        data = self._split_DF(DF_angles, "residue index")
+        density_dict, coordinates_dict = self._multiple_kde(data, limits[0].reshape(1,-1), resolution)
 
         name = name or "geom1d-" + "-".join(split_name(self.cluster_pdb))
 
-        labels = DF_angles.columns.tolist()
-
-        density_list = []
-        coordinates_list = []
-        for h_array in np_angles.T:
-
-            v_array = h_array.reshape(-1, 1)
-            density, coordinates = calculate_kde(
-                v_array, limits, resolution)
-            density_list.append(density)
-            coordinates_list.append(coordinates)
+        labels = DF_angles.columns.tolist()[1:]
 
         if self.to_csv:
 
@@ -1025,8 +1038,8 @@ Parameters:
 
             np.savez_compressed(
                 self.data_npz,
-                data=np.array(density_list),
-                coords=np.array(coordinates_list)
+                **density_dict,
+                **coordinates_dict
             )
 
             self.plot_type = "geom_1d"
@@ -1038,7 +1051,7 @@ Parameters:
             self._update_log()
 
         if not self.no_plot:
-            plt_distribution(density_list, coordinates_list,
+            plt_distribution(density_dict, coordinates_dict,
                              labels=labels,
                              name=name,
                              limits=limits,

@@ -239,12 +239,24 @@ def from_processed_data(args, **kargs):
 
     plot_limits = args[8].split()
     plot_limits = np.array([int(x) for x in plot_limits])
-    plot_limits = plot_limits.reshape(plot_dim, 2)
+    print(plot_limits)
+    if plot_dim in [1, 3]:
+        plot_limits = plot_limits.reshape(3, 2)
+    else:
+        plot_limits = plot_limits.reshape(plot_dim, 2)
+
     # print(plot_limits)
 
-    loaded_data = np.load(args[-1].strip())
-    density = loaded_data["data"]
-    coords = loaded_data["coords"]
+    if plot_dim == 1:
+        loaded_data = np.load(args[-1].strip())
+
+        density = {key: loaded_data[key] for key in loaded_data.files if "dens" in key}
+        coords = {key: loaded_data[key] for key in loaded_data.files if "coords" in key}
+
+    else:
+        loaded_data = np.load(args[-1].strip())
+        density = loaded_data["data"]
+        coords = loaded_data["coords"]
 
     for plot in plotting_functions:
         if int(plot) == plot_dim:
@@ -288,14 +300,18 @@ def from_raw_data(args, **kargs):
     DF_data = read_npz(args[-1].strip(), plot_axes_titles[plot_name])
 
     options = f"{plot_name[0]}{plot_dim or ''}"
-    print(options)
+    print(args[3])
+    if args[3] == "None":
+        truncate = None
+    else:
+        truncate = args[3]
 
     R = Visualize(
         structure,
         cluster,
         log_file=kargs["log_file"],
         no_plot=False,
-        truncate=args[3],
+        truncate=truncate,
         step=args[4]
     )
     R._init_log()
