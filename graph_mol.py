@@ -360,8 +360,10 @@ if __name__ == "__main__":
     for line in file:
         line = prep_line(line)
         if "ATOM" in line or "HETATM" in line:
+            print(line)
             mol.add_atom(line[1], line[11])
         if line[0] == "CONECT":
+            print(line)
             mol.add_bond(line[1:])
     mol.run()
     mol.newPDB(cluster_pdb)

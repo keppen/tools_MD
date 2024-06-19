@@ -4,6 +4,7 @@ import time
 import pandas as pd
 import numpy as np
 from rama_new import Visualize
+from compare_distributions import helix_find
 
 truncate = None
 options = None
@@ -19,13 +20,13 @@ start_time = time.time()
 
 def main(*arguments):
     """
-Entry point function for the program.
+    Entry point function for the program.
 
-Parameters:
-    run             | Run the analysis.
-    rerun           | Rerun from a run from log entry.
-    readlog         | Print formatted logfile.
-    -h, --help      | Display this help message and exit.
+    Parameters:
+        run             | Run the analysis.
+        rerun           | Rerun from a run from log entry.
+        readlog         | Print formatted logfile.
+        -h, --help      | Display this help message and exit.
     """
 
     option_actions = {
@@ -33,7 +34,7 @@ Parameters:
         "--help": lambda: print(main.__doc__),
         "readlog": lambda: read_log(arguments),
         "run": lambda: run(arguments),
-        "rerun": lambda: rerun(arguments)
+        "rerun": lambda: rerun(arguments),
     }
 
     if arguments[1] in option_actions:
@@ -42,22 +43,22 @@ Parameters:
 
 def read_log(arguments):
     """
-Function to read and process log file.
+    Function to read and process log file.
 
-Parameters:
-    -l, --log-file      | Log file name.
-    -s, --structure     | Structure pdb file name.
-    -c, --cluster       | Cluster pdb file name.
-    -rd, --raw-data     | Use raw data for plotting. Flag
-    -pm, --plot-name    | Filter by name of the plot.
-    -lb, --plot-labels  | Filter by labels for the plot.
-    -lm, --plot-limits  | Filter by limits for the plot.
-    -rs, --resolution   | Filter by resolution for the plot.
-    -pt, --plot-type    | Filter by type of the plot.
-    -id, --data-id      | Filter by data ID.
-    -h, --help          | Display this help message and exit.
-s
-    Filters does not work now!
+    Parameters:
+        -l, --log-file      | Log file name.
+        -s, --structure     | Structure pdb file name.
+        -c, --cluster       | Cluster pdb file name.
+        -rd, --raw-data     | Use raw data for plotting. Flag
+        -pm, --plot-name    | Filter by name of the plot.
+        -lb, --plot-labels  | Filter by labels for the plot.
+        -lm, --plot-limits  | Filter by limits for the plot.
+        -rs, --resolution   | Filter by resolution for the plot.
+        -pt, --plot-type    | Filter by type of the plot.
+        -id, --data-id      | Filter by data ID.
+        -h, --help          | Display this help message and exit.
+    s
+        Filters does not work now!
     """
 
     structure = None
@@ -111,18 +112,18 @@ s
 
 def run(arguments):
     """
-Function to run analysis and visualization.
+    Function to run analysis and visualization.
 
-Parameters:
-    -t, --truncate   | Truncate option.
-    -o, --options    | Options for the analysis.
-    --step           | Step option.
-    --no-plot        | Disable plotting.
-    -l, --log-file   | Path to the log file.
-    -s, --structure  | Path to the structure file.
-    -c, --cluster    | Cluster data.
-    --no-csv         | Disable CSV output.
-    -h, --help       | Display this help message and exit.
+    Parameters:
+        -t, --truncate   | Truncate option.
+        -o, --options    | Options for the analysis.
+        --step           | Step option.
+        --no-plot        | Disable plotting.
+        -l, --log-file   | Path to the log file.
+        -s, --structure  | Path to the structure file.
+        -c, --cluster    | Cluster data.
+        --no-csv         | Disable CSV output.
+        -h, --help       | Display this help message and exit.
     """
 
     truncate = None
@@ -161,7 +162,7 @@ Parameters:
         options=options,
         no_plot=no_plot,
         to_csv=to_csv,
-        log_file=log_file
+        log_file=log_file,
     )
     R._init_run()
 
@@ -170,14 +171,15 @@ Parameters:
 
 def rerun(arguments):
     """
-Function to rerun analysis from log entry.
+    Function to rerun analysis from log entry.
 
-Parameters:
-    -l, --log-file     | Path to the log file.
-    -id, --data-id     | Data ID for the log entry.
-    -dim, --dimension  | Plot dimension.
-    -n, --plot_name    | Plot name.
-    -h, --help         | Display this help message and exit.
+    Parameters:
+        -l, --log-file     | Path to the log file.
+        -id, --data-id     | Data ID for the log entry.
+        -dim, --dimension  | Plot dimension.
+        -n, --plot_name    | Plot name.
+        -h, --help         | Display this help message and exit.
+        helixfind          | Calculate helix similarity ratio
     """
 
     plot_dim = None
@@ -201,32 +203,69 @@ Parameters:
     logs.close()
 
     for entry in logs_lines:
-        fileds = entry.split(';')
+        fileds = entry.split(";")
         if str(data_id) == str(fileds[0]):
             run_opts = fileds
             break
 
+    print(run_opts[-1])
+    if "helixfind" in arguments:
+        call_helix_find(*run_opts)
+        exit()
+
     if "rawdata" in run_opts:
-        from_raw_data(run_opts, plot_name=plot_name,
-                      plot_dim=plot_dim, log_file=log_file)
+        from_raw_data(
+            run_opts, plot_name=plot_name, plot_dim=plot_dim, log_file=log_file
+        )
     else:
-        from_processed_data(run_opts, plot_name=plot_name,
-                            plot_dim=plot_dim, log_file=log_file)
+        from_processed_data(
+            run_opts, plot_name=plot_name, plot_dim=plot_dim, log_file=log_file
+        )
+
+
+def call_helix_find(*args, **kwargs):
+    loaded_subject = np.load(args[-1].strip())
+    density_subject = {
+        key: loaded_subject[key] for key in loaded_subject.files if "dens" in key
+    }
+    coords_subject = {
+        key: loaded_subject[key] for key in loaded_subject.files if "coords" in key
+    }
+
+    print(np.sum(density_subject["Chi 2 dens"]))
+    # print(coords_subject)
+
+    loaded_proper = np.load("proper_helix.npz")
+    density_proper = {
+        key: loaded_proper[key] for key in loaded_proper.files if "dens" in key
+    }
+    # coords_proper = {
+    #     key: loaded_proper[key] for key in loaded_proper.files if "coords" in key
+    # }
+
+    loaded_loose = np.load("loose_helix.npz")
+    density_loose = {
+        key: loaded_loose[key] for key in loaded_loose.files if "dens" in key
+    }
+    # coords_loose = {
+    #     key: loaded_loose[key] for key in loaded_loose.files if "coords" in key
+    # }
+    helix_find(coords_subject, density_subject, density_proper, density_loose, *args)
 
 
 def from_processed_data(args, **kargs):
     from libplot import mavi_contour, plt_ramachandran, plt_distribution
 
     plotting_functions = {
-        '1': lambda density, coords, limits, name, labels: plt_distribution(
+        "1": lambda density, coords, limits, name, labels: plt_distribution(
             density, coords, limits=limits, name=name, labels=plot_labels
-            ),
-        '2': lambda density, coords, limits, name, labels: plt_ramachandran(
+        ),
+        "2": lambda density, coords, limits, name, labels: plt_ramachandran(
             density, coords, limits=limits, name=name, labels=plot_labels
-            ),
-        '3': lambda density, coords, limits, name, labels: mavi_contour(
+        ),
+        "3": lambda density, coords, limits, name, labels: mavi_contour(
             density, coords, limits=limits, name=name, labels=plot_labels
-            ),
+        ),
     }
 
     plot_type = args[5]
@@ -280,15 +319,15 @@ def from_raw_data(args, **kargs):
     }
 
     plotting_functions = {
-        'd1': lambda data: R._do_rama_1d(data=data),
-        'd2': lambda data: R._do_rama_2d(data=data),
-        'd3': lambda data: R._do_rama_3d(data=data),
-        'g1': lambda data: R._do_geom_1d(data=data),
-        'g2': lambda data: R._do_geom_2d(data=data),
-        'g3': lambda data: R._do_geom_3d(data=data),
-        'h': lambda data: R._do_hbond(data=data),
-        'c': lambda data: R._do_contact(data=data),
-        'a': lambda data: R._do_axis(data=data),
+        "d1": lambda data: R._do_rama_1d(data=data),
+        "d2": lambda data: R._do_rama_2d(data=data),
+        "d3": lambda data: R._do_rama_3d(data=data),
+        "g1": lambda data: R._do_geom_1d(data=data),
+        "g2": lambda data: R._do_geom_2d(data=data),
+        "g3": lambda data: R._do_geom_3d(data=data),
+        "h": lambda data: R._do_hbond(data=data),
+        "c": lambda data: R._do_contact(data=data),
+        "a": lambda data: R._do_axis(data=data),
     }
     structure = args[1]
     cluster = args[2]
@@ -312,7 +351,7 @@ def from_raw_data(args, **kargs):
         log_file=kargs["log_file"],
         no_plot=False,
         truncate=truncate,
-        step=args[4]
+        step=args[4],
     )
     R._init_log()
 
@@ -324,14 +363,13 @@ def from_raw_data(args, **kargs):
 
 
 def read_npz(data_npz, columns=None):
-
     data_raw = np.load(data_npz)
-    data_raw = data_raw['rawdata']
+    data_raw = data_raw["rawdata"]
     return pd.DataFrame(data_raw, columns=columns)
 
 
 def print_log(log_file, **kargs):
-    with open(log_file, 'r') as file:
+    with open(log_file, "r") as file:
         titles = [
             "Data id",
             "Structure",
@@ -343,7 +381,7 @@ def print_log(log_file, **kargs):
             "Plot labels",
             "Plot limits",
             "Plot res",
-            "Data npz"
+            "Data npz",
         ]
         widths = [8, 16, 25, 9, 9, 12, 30, 25, 30, 19, 18]
 
@@ -354,10 +392,11 @@ def print_log(log_file, **kargs):
         logs = file.readlines()
         msg = ""
         for log in logs:
-            fields = [field.strip() for field in log.split(';')]
+            fields = [field.strip() for field in log.split(";")]
             formatted_fields = [
-                f"{field:<{width}}" for field, width in zip(fields, widths)]
-            msg += "".join(formatted_fields) + '\n'
+                f"{field:<{width}}" for field, width in zip(fields, widths)
+            ]
+            msg += "".join(formatted_fields) + "\n"
         print(msg)
 
 
