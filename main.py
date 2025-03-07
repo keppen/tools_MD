@@ -206,9 +206,10 @@ def rerun(arguments):
         fileds = entry.split(";")
         if str(data_id) == str(fileds[0]):
             run_opts = fileds
+            # print(fileds)
             break
 
-    print(run_opts[-1])
+    print(run_opts)
     if "helixfind" in arguments:
         call_helix_find(*run_opts)
         exit()
@@ -339,6 +340,7 @@ def from_raw_data(args, **kargs):
     DF_data = read_npz(args[-1].strip(), plot_axes_titles[plot_name])
 
     options = f"{plot_name[0]}{plot_dim or ''}"
+    print("options", options)
     print(args[3])
     if args[3] == "None":
         truncate = None
